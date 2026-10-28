@@ -67,4 +67,4 @@ Shared files are TL-owned or assigned to exactly one worker at a time. Workers i
 
 | Date | Entry |
 | --- | --- |
-| 2026-10-28 | Fork created from `zai-org/zcode@3c5b2276` (public repo, full history + tags). W0 audit, governance doc set (10 files), architecture-policy registration of module `marketing`, marketing domain layer vertical slice (`packages/marketing`), loop demo all-gates-pass run recorded as evidence. |
+| 2026-10-28 | Fork created from `zai-org/zcode@3c5b2276` (public repo, full history + tags). W0 audit, governance doc set (10 files), architecture-policy registration of module `marketing`, marketing domain layer vertical slice (`packages/marketing`), loop demo all-gates-pass run recorded as evidence. Commit: `934e1e59` (main). |
