@@ -1,6 +1,6 @@
 # MARKETING-ARCHITECTURE-LOCK
 
-> Authoritative architectural boundaries for the marketing domain layer. Violations block merge. Owned by the TL. Last updated: 2026-10-28 (W0/W1 baseline).
+> Authoritative architectural boundaries for the marketing domain layer. Violations block merge. Owned by the TL. Last updated: 2026-10-28 (W3-1: marketing-plugin registered in the CLI chain; managed module `marketing-plugin`).
 
 ## The one architectural decision that matters most
 
@@ -35,10 +35,10 @@ docs/marketing/                      Governance (this file set — single source
 packages/marketing/src/domain/       Canonical records, value objects, contracts (pure, zero I/O)
 packages/marketing/src/app/          Temporal store, capability catalog, workflows, ports
 packages/marketing/src/adapters/     Connector adapters, model adapters, persistence adapters
-apps/zcode-cli/packages/marketing-plugin/   CLI plugin exposing marketing tools to the runtime (W3+)
+apps/zcode-cli/packages/marketing-plugin/   CLI plugin exposing marketing tools to the runtime (W3-1, live: official plugin `marketing`, stdio MCP server; contract in its `src/contract.ts`)
 ```
 
-`packages/marketing` is registered in `architecture-policy.yaml` as a managed module with layering `domain → app → adapters` (mirrors the `storage` module pattern). Public entrypoints are explicit; cross-package imports must use public entrypoints and existing path aliases only.
+`packages/marketing` is registered in `architecture-policy.yaml` as a managed module with layering `domain → app → adapters` (mirrors the `storage` module pattern), and `apps/zcode-cli/packages/marketing-plugin` as a managed module with layer `app` (mirrors the `office-runtime` plugin pattern; `requires: marketing`, owner `marketing-tl`). Public entrypoints are explicit; cross-package imports must use public entrypoints and existing path aliases only.
 
 ## Migration and change rules
 

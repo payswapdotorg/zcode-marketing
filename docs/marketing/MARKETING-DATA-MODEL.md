@@ -40,6 +40,7 @@ Every observation carries at minimum: `observed_at` (when the system saw it), `p
 - Changes are new observations or explicit revisions — **history is never silently rewritten**.
 - As-of queries return the observations available at that time, never accidentally substituting current values.
 - The time machine **cannot** reconstruct states it never recorded; missing history is honestly reported unless an eligible archive, licensed source, or user-provided historical report supplies it (acquisition method 4).
+- Read models: `allAds()`, `allOrganic()`, `allMetrics()` (added W3-1 for the evidence viewer — additive, no write-path change), `latestCoverage()`, plus the as-of/velocity queries above. Everything a tool or surface shows must come from these read models, never from side caches.
 
 ## Measurement discipline (encoded in the engine, not left to the model)
 

@@ -45,6 +45,8 @@ export interface TemporalStorePort {
   velocity(metricKey: string, subjectRef: string, at: string, windowDays: number): number | undefined;
   allAds(): AdCreative[];
   allOrganic(): OrganicContent[];
+  /** Full observation read model for evidence/provenance viewers (W3-1 contract addition). */
+  allMetrics(): MetricObservation[];
   latestCoverage(): CoverageReport | undefined;
   ingestAudit(): ReadonlyArray<{ at: string; key: string; outcome: 'new' | 'duplicate' | 'superseded' }>;
 }
@@ -148,6 +150,12 @@ export class TemporalStore implements TemporalStorePort {
 
   allOrganic(): OrganicContent[] {
     return [...this.organic.values()];
+  }
+
+  allMetrics(): MetricObservation[] {
+    return [...this.metrics.values()]
+      .flatMap((bySubject) => [...bySubject.values()].flat())
+      .sort((a, b) => a.observedAt.localeCompare(b.observedAt));
   }
 
   latestCoverage(): CoverageReport | undefined {

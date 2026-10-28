@@ -1,0 +1,177 @@
+# W3 runtime integration evidence — marketing plugin tool chain through a real MCP server process
+# Date: 2026-10-28 (recorded from the session transcript; rerunnable, see footer)
+# Work order: W3-1 (WORK-REGISTRY.md) — marketing tools in the CLI plugin chain
+# Reproduce: cd apps/zcode-cli/packages/marketing-plugin && pnpm demo:w3
+#            (builds dist/server.mjs, then spawns it and drives the chain through the stdio MCP client)
+# Environment: full bootstrapped repo (pnpm 10.33.2, node 24.22.1), sandbox with live network.
+# Note on "RivalOne"/"RivalTwo": fictional competitor names — youtube.com returns HTTP 404 for
+# their handles, and the connector reports those slices as [unavailable] coverage gaps (honest),
+# while the demo-mode labeled synthetic fixtures carry the full loop. Real channel ids/handles
+# resolve normally (verified in W1: evidence/2026-10-28-w1-source-access-youtube-public.txt).
+#
+# Gates asserted in this run (all passed):
+#   W3 gate: user describes a product -> chooses a platform -> evidence-backed report with
+#            explicit gaps and explainable creative opportunities (sections 1-6).
+#   W2 gate: idempotent research through the plugin chain (section 3b).
+#   Honesty: live-mode refuses ranking without a verified ad source (section 8);
+#            missions persist in the workspace index (section 9).
+#
+# --- transcript follows ---
+
+Connected to marketing MCP server (/home/z/my-project/repos/zcode-marketing/apps/zcode-cli/packages/marketing-plugin/dist/server.mjs)
+Workspace: /tmp/w3-chain-gxgCIL
+
+
+== 1. marketing_mission_start (demo mode: full paid x organic loop) ==
+  ✔ mission started and persisted
+Mission started: mission-w3-chain (demo mode)
+Product: portable espresso maker — offer: 30-day home trial, free shipping
+Objective: sales; platform: youtube; market: US
+
+Next: call marketing_discover_competitors with 2-5 competitor name hints the user mentioned (or ask the user which competitors matter).
+
+== 2. marketing_discover_competitors ==
+  ✔ competitor candidates returned with user confirmations
+Competitor candidates for mission-w3-chain:
+- RivalOne (identity confidence 0.80) [user-confirmed] — overlapping product category and audience with the described offer
+- RivalTwo (identity confidence 0.80) [user-confirmed] — overlapping product category and audience with the described offer
+
+Ask the user to confirm/correct these (re-call with `confirm` for confirmed names), then proceed with marketing_research_platform.
+
+== 3. marketing_research_platform (run 1) ==
+  ✔ research run through the connector chain
+Research run complete for mission-w3-chain — ingested: 2 ads, 2 organic, 13 metric observations.
+
+Coverage (explicit per-slice honesty):
+- [unavailable] organic-uploads:RivalOne (connector:youtube-public v0.1.0) — not resolvable through permitted public routes in this run: coverage_gap — channel 'RivalOne' not found through public routes (HTTP 404)
+- [unavailable] organic-uploads:RivalTwo (connector:youtube-public v0.1.0) — not resolvable through permitted public routes in this run: coverage_gap — channel 'RivalTwo' not found through public routes (HTTP 404)
+- [unavailable] video-statistics-history:youtube (connector:youtube-public v0.1.0) — keyless routes expose current-snapshot counts only; per-video historical time series require the key-based Data API (unverified — no credentials in this environment)
+- [not_connected] private-analytics:youtube (connector:youtube-public v0.1.0) — creator private analytics require an authorized account connection (W6 scope)
+- [available] organic-content:youtube (sample-platform v0.1.0) — publicly accessible posts, observable engagement and timestamps
+- [restricted] competitor-ad-library:meta (sample-adlib v0.1.0) — coverage restricted by source, country, date and advertiser access
+- [not_connected] private-conversion-performance (sample-adlib v0.1.0) — requires advertiser account access, measurement integrations or supplied reports
+
+Conclusion: Available evidence supports a preliminary creative hypothesis; it does not support a definitive ranking of competitors by sales or ROAS.
+
+== 3b. research again — idempotent ingest (W2 gate through the plugin chain) ==
+  ✔ second research run succeeds
+  ✔ double research run is idempotent for entities (no new ads/organic, no inflation)
+  ✔ metric growth is bounded to fresh live snapshots (new observedAt = new evidence, by design)
+
+== 4. marketing_analyze_creative (Stage B) ==
+  ✔ creative structure extracted with provenance
+Creative feature extraction (mission-w3-chain): 2 ad + 2 organic feature sets.
+Extraction models used: heuristic:multimodal
+
+- ad-rivalone-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof -> discount-close; offer: percentage discount with deadline
+- ad-rivaltwo-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof -> discount-close; offer: percentage discount with deadline
+- yt-101: hook "creator-led demonstration" (identity-led); narrative problem -> in-use demo -> results; offer: implicit value, soft cta
+- yt-102: hook "creator-led personal benefit reveal" (identity-led); narrative problem -> in-use demo -> results; offer: implicit value, soft cta
+
+Note: heuristic extraction adapters are labeled in every feature set; capability-routed models replace them without workflow changes (MARKETING-CAPABILITY-MAP.md).
+
+== 5. marketing_rank_opportunities (Stages C+D) ==
+  ✔ opportunities ranked with SEPARATED scores
+  ✔ at least one opportunity
+  ✔ top opportunity carries BOTH paid and organic evidence refs
+Ranked opportunities (mission-w3-chain) — scores are SEPARATED, never blended:
+#1 show the product delivering the promised benefit in the first 3 seconds
+    hook: creator-led personal benefit reveal | format: 9:16 creator demo, 30s
+    observed 5975.9 | cross-source 1 | predicted 14000 | confidence 0.60
+    evidence: ad-rivalone-v0, yt-102, yt-101
+    contrary: none recorded
+    why: supported by 1 paid + 2 organic independent refs; 0 contrary; confidence reflects evidence completeness, not model certainty
+
+== 6. marketing_mission_report (the W3 exit-gate artifact) ==
+  ✔ report composed
+  ✔ report states coverage gaps explicitly
+  ✔ report carries an honest limitations section
+  ✔ report labels the demo/synthetic evidence
+# Marketing intelligence report — mission-w3-chain
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (2)
+
+- RivalOne [confirmed] — overlapping product category and audience with the described offer
+
+- RivalTwo [confirmed] — overlapping product category and audience with the described offer
+
+## Data coverage (explicit gaps, never silently filled)
+
+- [unavailable] organic-uploads:RivalOne (connector:youtube-public) — not resolvable through permitted public routes in this run: coverage_gap — channel 'RivalOne' not found through public routes (HTTP 404)
+
+- [unavailable] organic-uploads:RivalTwo (connector:youtube-public) — not resolvable through permitted public routes in this run: coverage_gap — channel 'RivalTwo' not found through public routes (HTTP 404)
+
+- [unavailable] video-statistics-history:youtube (connector:youtube-public) — keyless routes expose current-snapshot counts only; per-video historical time series require the key-based Data API (unverified — no credentials in this environment)
+
+- [not_connected] private-analytics:youtube (connector:youtube-public) — creator private analytics require an authorized account connection (W6 scope)
+
+- [available] organic-content:youtube (sample-platform) — publicly accessible posts, observable engagement and timestamps
+
+- [restricted] competitor-ad-library:meta (sample-adlib) — coverage restricted by source, country, date and advertiser access
+
+- [not_connected] private-conversion-performance (sample-adlib) — requires advertiser account access, measurement integrations or supplied reports
+
+Conclusion: Available evidence supports a preliminary creative hypothesis; it does not support a definitive ranking of competitors by sales or ROAS.
+
+## Performance signals (objective-appropriate, like-for-like)
+
+- ad-rivalone-v0: [PROXY] impressions (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on impressions (latest 31000)
+
+- ad-rivaltwo-v0: [PROXY] impressions (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on impressions (latest 11000)
+
+- yt-101: [PROXY] views (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on views (latest 52000)
+
+- yt-102: [PROXY] views (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on views (latest 21000)
+
+## Creative opportunities
+
+#1 show the product delivering the promised benefit in the first 3 seconds — hook "creator-led personal benefit reveal", format 9:16 creator demo, 30s, confidence 0.60; evidence ad-rivalone-v0, yt-102, yt-101
+
+Scores (observed / cross-source / predicted / confidence) and contrary evidence: call marketing_rank_opportunities.
+
+## Limitations (honest)
+
+- DEMO MODE: fixture ads and the fixture organic entries (yt-101, yt-102) come from the labeled synthetic sample connector; public YouTube entries (yt:<video id>) are real. Every record carries its source id.
+
+- Heuristic model adapters perform the structured extraction; provenance is recorded per record (extractionModelRef).
+
+- View counts are current-snapshot public stats, not full history; velocity uses comparab
+… [truncated]
+
+== 7. marketing_evidence_view (provenance for every record) ==
+  ✔ evidence trail available with ingest audit
+  ✔ idempotent ingest audit visible to the user
+Evidence store for mission-w3-chain:
+- ads: 2 | organic: 2 | metric observations: 13
+- ingest audit: 17 new, 17 duplicates ignored, 0 superseded (idempotent ingest, explicit revisions)
+
+- AD ad-rivalone-v0 from sample-adlib v0.1.0 (advertiser comp-rivalone), format 9:16 video
+- AD ad-rivaltwo-v0 from sample-adlib v0.1.0 (advertiser comp-rivaltwo), format 9:16 video
+- ORGANIC yt-101 from sample-platform v0.1.0, published 2026-05-01T15:47:31.416Z, format creator-led demo
+- ORGANIC yt-102 from sample-platform v0.1.0, published 2026-10-16T15:47:31.416Z, format creator-led demo
+- METRIC yt-101 views=40000 observed 2026-05-01T15:47:31.416Z (sample-platform, def platform-public-stat v1)
+- METRIC ad-rivalone-v0 impressions=12000 observed 2026-06-30T15:47:31.416Z (sample-adlib, def platform-public-stat v1)
+- METRIC yt-101 views=46000 observed 2026-06-30T15:47:31.416Z (sample-platform, def platform-public-stat v1)
+- METRIC ad-rivalone-v0 impressions=18000 observed 2026-07-30T15:47:31.416Z (sample-adlib, def platform-public-stat v1)
+- METRIC ad-rivaltwo-v0 impressions=8000 observed 2026-07-30T15:47:31.416Z (sample-adlib, def platform-public-stat v1)
+- METRIC ad-rivalone-v0 impressions=26000 observed 2026-08-29T15:47:31.416Z (sample-adlib, def platform-public-stat v1)
+- METRIC ad-rivaltwo-v0 impressions=9500 observed 2026-08-29T15:47:31.416Z (sample-adlib, def platform-public-stat v1)
+- METRIC yt-101 views=52000 observed 2026-08-29T15:47:31.416Z (sample-platform, def platform-public-stat v1)
+- METRIC ad-rivalone-v0 impressions=31000 observed 2026-09-28T15:47:31.416Z (sample-adlib, def platform-public-stat v1)
+- METRIC ad-rivaltwo-v0 impressions=11000 observed 2026-09-28T15:47:31.416Z (sample-adlib, def platform-public-stat v1)
+- METRIC yt-102 views=3000 observed 2026-10-16T15:47:31.416Z (sample-platform, def platform-public-stat v1)
+- METRIC yt-102 views=9000 observed 2026-10-20T15:47:31.416Z (sample-platform, def platform-public-stat v1)
+- METRIC yt-102 views=21000 observed 2026-10-24T15:47:31.416Z (sample-platform, def platform-public-stat v1)
+
+== 8. live-mode paid-source honesty (refuses to invent ad data) ==
+  ✔ live mode refuses ranking without a verified ad source
+  ✔ live report states the open ad-source blocker instead of inventing data
+
+== 9. mission list (workspace persistence) ==
+  ✔ missions persisted in the workspace index
+
+ALL W3 CHAIN GATES PASSED — marketing tools run end-to-end through the plugin MCP chain.
+Workspace root: /tmp/w3-chain-gxgCIL

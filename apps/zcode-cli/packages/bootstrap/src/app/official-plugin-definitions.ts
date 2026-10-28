@@ -246,6 +246,30 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
       version,
     }),
   ),
+  // 营销情报插件（本 fork 新增，W3-1）：MCP server 由 marketing-plugin 构建产物 dist/server.mjs
+  // 提供，技能引导 Agent 走 mission 工具链；治理唯一事实源 docs/marketing/。
+  {
+    defaultEnabled: true,
+    listing: {
+      author: ZAI_AUTHOR,
+      category: "productivity",
+      displayName: "Marketing Intelligence",
+      displayName_i18n: { "zh-CN": "营销情报" },
+      description_i18n: {
+        "zh-CN": "证据支撑的营销情报任务：竞品调研、创意结构分析与显式标注数据空缺的机会排序。",
+      },
+    },
+    name: "marketing",
+    // 与文档插件同一约定：dist 构建产物先于 bootstrap 种子校验（turbo test dependsOn build）。
+    requiredSeedPaths: ["dist/server.mjs", "skills/marketing/SKILL.md"],
+    rootCandidates: [
+      "packages/marketing-plugin",
+      "../marketing-plugin",
+      "../../marketing-plugin",
+      "../../../marketing-plugin",
+    ],
+    version: "0.1.0",
+  },
   {
     // 沿用原聚合文档插件的官方搜图能力，仅拆出独立开关；认证仍由官方 MCP adapter 注入。
     defaultEnabled: true,

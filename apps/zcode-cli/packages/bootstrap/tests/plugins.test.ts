@@ -614,7 +614,8 @@ describe("ZCode plugins", () => {
             id: "zcode-plugins-official",
             isOfficial: true,
             name: "zcode-plugins-official",
-            pluginCount: 14,
+            // 15 = 14 个上游官方插件 + marketing（本 fork W3-1 新增，见 official-plugin-definitions.ts）。
+            pluginCount: 15,
             source: {
               source: "url",
               url: "https://cdn-zcode.z.ai/zcode/official-plugin/marketplace.json",
@@ -2395,7 +2396,8 @@ describe("ZCode plugins", () => {
       expect(
         overview.marketplaces.find((marketplace) => marketplace.id === "zcode-plugins-official"),
       ).toMatchObject({
-        pluginCount: 14,
+        // 15 = 14 个上游官方插件 + marketing（本 fork W3-1 新增）。
+        pluginCount: 15,
         source: {
           source: "url",
           url: "https://cdn-zcode.z.ai/zcode/official-plugin/marketplace.json",

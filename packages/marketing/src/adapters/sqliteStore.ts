@@ -33,6 +33,7 @@ import {
   type CoverageReport,
   type MetricObservation,
   type OrganicContent,
+  metricObservation,
   organicContent,
 } from '../domain/records.js';
 import type { IngestResult, TemporalStorePort } from '../app/temporalStore.js';
@@ -218,6 +219,13 @@ export class SqliteTemporalStore implements TemporalStorePort {
 
   allOrganic(): OrganicContent[] {
     return this.rows('OrganicContent').map((r) => organicContent.parse(JSON.parse(r)));
+  }
+
+  allMetrics(): MetricObservation[] {
+    const rows = this.db
+      .prepare('SELECT record_json FROM marketing_metric_observation ORDER BY observed_at')
+      .all() as Array<{ record_json: string }>;
+    return rows.map((r) => metricObservation.parse(JSON.parse(r.record_json)));
   }
 
   latestCoverage(): CoverageReport | undefined {

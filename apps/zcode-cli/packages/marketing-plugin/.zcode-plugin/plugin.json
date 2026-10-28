@@ -1,0 +1,25 @@
+{
+  "name": "marketing",
+  "version": "0.1.0",
+  "description": "Built-in marketing intelligence plugin: evidence-backed competitor research, creative analysis, and opportunity ranking through the marketing mission tools.",
+  "description_i18n": {
+    "en": "Evidence-backed marketing intelligence missions: describe a product, research a platform's competitors, and get explicit-gap coverage reports with explainable creative opportunities.",
+    "zh-CN": "证据支撑的营销情报任务：描述产品、调研平台竞品，获得显式标注数据空缺的覆盖报告与可解释的创意机会。"
+  },
+  "author": {
+    "name": "Z.ai"
+  },
+  "license": "Apache-2.0",
+  "skills": "skills",
+  "mcpServers": {
+    "marketing": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/dist/server.mjs"],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "env": {
+        "ZCODE_WORKSPACE_ROOT": "${ZCODE_PROJECT_DIR}"
+      }
+    }
+  }
+}

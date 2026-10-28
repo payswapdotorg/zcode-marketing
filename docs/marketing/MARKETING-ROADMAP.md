@@ -1,6 +1,6 @@
 # MARKETING-ROADMAP
 
-> Phases, dependencies, deliverables, acceptance gates, and open blockers. Wave gates are non-negotiable; a wave is complete when its gate passes with recorded evidence (see WORK-REGISTRY.md for live status). Last updated: 2026-10-28 (full-env verification closed; W2 complete; W1 organic-side verified).
+> Phases, dependencies, deliverables, acceptance gates, and open blockers. Wave gates are non-negotiable; a wave is complete when its gate passes with recorded evidence (see WORK-REGISTRY.md for live status). Last updated: 2026-10-28 (W3-1 slice complete: marketing plugin registered and chain-verified; W2 gates re-verified through the plugin chain).
 
 ## Wave plan
 
@@ -22,7 +22,7 @@
 ### W3 — First end-to-end intelligence workflow
 - Product onboarding form, competitor discovery, platform research, evidence viewer, creative feature extraction, cross-source opportunity ranking.
 - **Exit gate:** a user can describe a product, choose a platform, and see an evidence-backed report with explicit data gaps and explainable creative opportunities.
-- **Status:** ⬜ Not started. Requires marketing plugin/tool registration in the CLI runtime (see MARKETING-CAPABILITY-MAP.md) and web/desktop surfaces.
+- **Status:** 🟡 In progress — W3-1 slice complete (2026-10-28). Marketing tools run in the CLI plugin chain: `apps/zcode-cli/packages/marketing-plugin` (official plugin `marketing`, stdio MCP server, default-enabled) registers `marketing_mission_start/_list`, `marketing_discover_competitors`, `marketing_research_platform`, `marketing_analyze_creative`, `marketing_rank_opportunities`, `marketing_mission_report`, `marketing_evidence_view` — each with zod inputSchema + outputSchema (outputs reuse the canonical domain records) and side-effect annotations; missions persist in the workspace (`.zcode/marketing/` JSON index + one SQLite temporal store per mission, reusing the W2 persistence adapter). The full chain ran through a real spawned MCP server process and passed the W2 gates plus the W3 gate: evidence/2026-10-28-w3-plugin-chain-run.txt. In-chat evidence viewing works through the tools; a rendered evidence-viewer UI panel is deferred to a follow-up work order (the in-tool report + evidence_view output satisfy the wave gate). Live-mode paid-side honesty: without a verified ad source the ranking tool returns a typed `paid_source_gap` error and the report states the W1-3(b) blocker instead of inventing data; demo mode exercises the full paid×organic loop with labeled synthetic fixtures.
 
 ### W4 — Creative strategy and production handoff
 - Structured creative brief, generator-specific prompts, scripts, storyboards, testable hypotheses; asset upload, comparison, validation.
@@ -54,5 +54,5 @@
 | --- | --- | --- |
 | ~~Full-environment verification (pnpm bootstrap, typecheck/lint/architecture check, upstream suites)~~ | TL | ✅ Closed 2026-10-28 — executed in a complete bootstrapped environment, all gates pass; truthful record incl. limitations: `evidence/2026-10-28-full-env-verification.txt` |
 | Ad-intelligence source selection for first market (Meta Ad Library region scope vs TikTok EU scope decision) | Worker A + TL | Meta Ad Library access path probed (reachable, credentials required); decision blocked on a credentialed W1-3(b) test + intended market/geography definition |
-| Marketing plugin registration in CLI runtime | TL | W3 entry; follows tool change chain spec `apps/zcode-cli/docs/design/v2/tool/00-tool-change-chain.md` |
+| ~~Marketing plugin registration in CLI runtime~~ | TL | ✅ Closed 2026-10-28 — official plugin `marketing` registered (`apps/zcode-cli/packages/marketing-plugin`, default-enabled, stdio MCP server + skill); tools follow the tool change chain contract with zod input/output schemas; evidence: `evidence/2026-10-28-w3-plugin-chain-run.txt`. Remaining for W3 closure: real-model bridge for structured extraction (capability-routed provider integration) + evidence-viewer UI panel follow-up order. |
 | Real publishing sandbox account | Worker A | W5 entry |
