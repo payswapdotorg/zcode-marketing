@@ -50,6 +50,11 @@ describe("marketing-plugin contract", () => {
             missionIndex: MARKETING_MISSIONS_INDEX,
             missionDb: ".zcode/marketing/missions/<missionId>.sqlite",
           },
+          modelChannel: {
+            provenancePrefix: "zcode:routed:",
+            fallbackMarker: "(fallback:",
+            heuristicPrefix: "heuristic:",
+          },
         } satisfies MarketingPluginContract,
         root,
       );

@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import {
   CapabilityCatalog,
+  FallbackModelPort,
   HeuristicModel,
   MarketingMission,
   SampleConnector,
@@ -28,9 +29,11 @@ import type {
   CompetitorCandidate,
   ConnectorMeta,
   MarketingConnector,
+  ModelPort,
   ProductBrief,
   TemporalStorePort,
 } from '@zcode/marketing';
+import { McpSamplingModel, type SamplingClient } from './samplingModel.js';
 
 export const researchMode = z.enum(['live', 'demo']);
 export type ResearchMode = z.infer<typeof researchMode>;
@@ -138,9 +141,36 @@ export interface RuntimeOptions {
 export class MarketingRuntime {
   private readonly dir: string;
   private readonly loaded = new Map<string, LoadedMission>();
+  /** Late-bound host sampling channel (W3-2): set by main() after the MCP
+   * initialize handshake when the host declared the `sampling` capability. */
+  private sampling?: SamplingClient;
+  private modelPort?: ModelPort;
 
   constructor(workspaceRoot: string, private readonly opts: RuntimeOptions = {}) {
     this.dir = join(workspaceRoot, '.zcode', 'marketing');
+  }
+
+  /** Binds the host sampling channel; must be called before the first mission open. */
+  setSamplingClient(client: SamplingClient): void {
+    if (this.modelPort) {
+      throw new Error('sampling client must be bound before missions open');
+    }
+    this.sampling = client;
+  }
+
+  /**
+   * Production model port (W3-2): host-routed sampling as primary with the
+   * labeled heuristic adapter as recorded fallback; without a host sampling
+   * channel the labeled heuristic runs alone (tests/demo wiring). The catalog
+   * never sees the fallback as a competing production capability.
+   */
+  buildModelPort(): ModelPort {
+    if (!this.modelPort) {
+      this.modelPort = this.sampling
+        ? new FallbackModelPort(new McpSamplingModel(this.sampling), new HeuristicModel())
+        : new HeuristicModel();
+    }
+    return this.modelPort;
   }
 
   private get now(): () => string {
@@ -202,7 +232,7 @@ export class MarketingRuntime {
     const mission = new MarketingMission(
       entry.brief,
       connector,
-      new CapabilityCatalog(new HeuristicModel()),
+      new CapabilityCatalog(this.buildModelPort()),
       this.now,
       store,
     );

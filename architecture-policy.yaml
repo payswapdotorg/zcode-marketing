@@ -755,6 +755,21 @@ modules:
     layers:
       app: .
     owner: marketing-tl
+  # mcp-server-sampling：由 architecture:adopt 登记
+  - id: mcp-server-sampling
+    roots:
+      - apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-server-sampling
+    managed: true
+    requires:
+      - mcp-apps-protocol
+      - shared
+      - zcode-cli
+    publicEntrypoints:
+      - apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-server-sampling/index.ts
+      - apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-server-sampling/contract.ts
+    layers:
+      app: .
+    owner: marketing-tl
 
 global:
   # 临时时间戳（2026-09-10）：unmanaged-new-file 只约束此日期之后首次入库的文件。

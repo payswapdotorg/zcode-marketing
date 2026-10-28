@@ -178,7 +178,17 @@ export class MarketingMission {
       ),
     });
     const { value, routing } = await this.catalog.runRouted('extractCreativeFeatures', {
-      subjects: subjects.map((s) => ({ id: s.id, format: s.format, platform: s.platform })),
+      subjects: subjects.map((s) => ({
+        id: s.id,
+        format: s.format,
+        platform: s.platform,
+        // Real creative signal for capability-routed extraction (additive; the
+        // heuristic stand-in ignores it): ad variation copy / organic metadata.
+        ...('variations' in s && s.variations.length > 0 ? { creativeVariations: s.variations } : {}),
+        ...('availableMetadata' in s && Object.keys(s.availableMetadata).length > 0
+          ? { metadata: s.availableMetadata }
+          : {}),
+      })),
     }, schema);
     return value.features.map((f) => ({
       kind: 'CreativeFeatureSet' as const,
@@ -189,7 +199,7 @@ export class MarketingMission {
       narrative: f.narrative,
       offerStructure: f.offerStructure,
       visualStructure: f.visualStructure,
-      extractionModelRef: routing.modelRef,
+      extractionModelRef: routing.executedModelRef,
       evidence: [evRef(`features:${f.subjectRef}`, 'extracted from observed creative', this.now())],
     }));
   }
@@ -347,7 +357,7 @@ export class MarketingMission {
           metric: hypothesis.predictedOutcome.metricKey,
           windowDays: 14,
         },
-        draftedBy: routing.modelRef,
+        draftedBy: routing.executedModelRef,
       },
       promptPack: {},
     });

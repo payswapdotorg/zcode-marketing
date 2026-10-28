@@ -29,7 +29,13 @@ non-negotiable.
    coverage report out loud: which slices are available, restricted, or
    missing. Idempotent — re-running never duplicates data, but do not spam it.
 4. **Analyze creative** — `marketing_analyze_creative` extracts hooks, narrative
-   and offer structure from observed ads/organic content.
+   and offer structure from observed ads/organic content. Structured extraction
+   routes through the host's model system when the host declares the MCP
+   `sampling` capability; each feature set records which model executed it
+   (`extractionModelRef`). `zcode:routed:<model>` = the real routed model;
+   `heuristic:* (fallback: ...)` = the labeled stand-in adapter after a channel
+   failure — report the difference honestly, never present fallback output as
+   model analysis.
 5. **Rank opportunities** — `marketing_rank_opportunities` (Stages C+D). Scores
    are SEPARATED (observed / cross-source support / predicted / confidence);
    present them as four distinct numbers and always cite the evidence refs and
@@ -52,6 +58,10 @@ non-negotiable.
   metric; proxies are labeled `[PROXY]`.
 - Demo-mode fixtures are synthetic and labeled; real public YouTube records are
   `yt:<video id>`.
+- Provenance is checkable: which model extracted a feature set, which connector
+  produced a record, and when it was observed. When extraction fell back to the
+  heuristic adapter, say so instead of presenting generic output as model
+  analysis.
 - Never claim a number the evidence store does not contain; use
   `marketing_evidence_view` to check before asserting.
 - Publishing tools do not exist in this wave. If the user wants to publish,

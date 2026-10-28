@@ -1,0 +1,189 @@
+# W3-2 real-model bridge evidence — capability-routed structured extraction through the host sampling channel
+# Date: 2026-10-29 (recorded from the session transcript; rerunnable, see footer)
+# Work order: W3-2 (WORK-REGISTRY.md) — real-model bridge: MCP sampling -> host provider system
+# Reproduce: cd apps/zcode-cli/packages/marketing-plugin && pnpm build
+#   Deterministic backend (no network model): node scripts/w3-2-sampling-chain.mjs
+#   Real-model backend: W32_SAMPLING_BACKEND=<backend.mjs> node scripts/w3-2-sampling-chain.mjs
+#     where backend.mjs default-exports sample({systemPrompt,userText,maxTokens}) -> {text,model}.
+# Backend of THIS run: /home/z/my-project/marketing-demo-tools/w32-glm-backend.mjs — GLM (glm-4-plus)
+#   via z-ai-web-dev-sdk, standing in for the CLI host's provider-routed sampleModel backend
+#   (the sandbox has no CLI provider credentials; the wire path is identical — the same
+#   sampling/createMessage JSON-RPC that the CLI host answers through its provider registry,
+#   validated by the same shared zod contract and attributed by the same active-call trace).
+# Environment: full bootstrapped repo (pnpm 10.33.2, node 24.22.1), sandbox with live network.
+#
+# What this run proves (all gates passed, exit 0):
+#   1. Structured tasks (competitor classification, creative feature extraction, paid x organic
+#      synthesis) route through the host sampling channel: every feature set carries
+#      extractionModelRef 'zcode:routed:glm-4-plus' — the ACTUAL model that produced it.
+#   2. REAL content, REAL analysis: competitor hints were real brands; the keyless YouTube
+#      connector resolved Wacaco's real channel (UC-y91EU3KtDG_yZuSxeMI6w) and ingested 15 real
+#      uploads; the real model extracted their creative structure (e.g. side-by-side comparison
+#      hook, cleaning-demo narrative beats) — 17 organic + 2 labeled fixture ads analyzed.
+#      AeroPress' handle 404'd through public routes and surfaced as an [unavailable] coverage
+#      slice (honest), never invented.
+#   3. Real-model discovery: the classified candidates come with grounded relevance ("Wacaco
+#      manufactures portable espresso makers like the Minipresso...").
+#   4. Task-shaped modelPreferences travel the wire (extraction: cost .5 / speed .4 / int .7).
+#   5. Fallback honesty: the declined-host phase completes the SAME chain with every record
+#      stamped 'heuristic:* (fallback: ...)' — visibly generic output vs the routed phase's
+#      specific analysis — and the report states the fallback instead of hiding it.
+#   6. W2 gates still hold through the plugin chain (idempotent ingest, entities stable).
+# Honest notes:
+#   - One in-channel schema-repair attempt is built into the adapter (a mis-shaped first answer
+#     is re-asked once with the zod issues embedded; a second failure falls through to the
+#     labeled fallback). GLM 429 rate limits occurred mid-run and were retried by the backend
+#     wrapper (attempt lines visible below) — transient, not part of the measured path.
+#   - The paid side comes from the labeled synthetic fixtures (demo mode) — live-mode paid
+#     intelligence remains blocked on W1-3(b) credentials, unchanged.
+#   - The declined phase makes no model calls by design (the host refuses over the wire).
+#
+# --- transcript follows ---
+Marketing plugin W3-2 sampling-bridge evidence run
+Server: /home/z/my-project/zcode/apps/zcode-cli/packages/marketing-plugin/dist/server.mjs
+Sampling backend: /home/z/my-project/marketing-demo-tools/w32-glm-backend.mjs
+
+== phase: host answers sampling through the backend ==
+  ✔ mission started (demo mode: real organic side + labeled synthetic paid side)
+Mission started: mission-w3-2-bridge (demo mode)
+Product: portable espresso maker — offer: 30-day home trial, free shipping
+Objective: sales; platform: youtube; market: US
+
+Next: call marketing_discover_competitors with 2-5 competitor name hints the user mentioned (or ask the user which competitors matter).
+  ✔ competitor discovery returned candidates
+  ✔ research run through the verified connector chain
+  ✔ idempotent ingest still holds (W2 gate through the plugin chain)
+  ✔ creative analysis succeeded
+  ✔ feature sets extracted for observed subjects
+  ✔ host-routed model recorded in EVERY feature set (zcode:routed:<model> provenance)
+Creative feature extraction (mission-w3-2-bridge): 2 ad + 17 organic feature sets.
+Extraction models used: zcode:routed:glm-4-plus
+
+- ad-rivalone-v0: hook "benefit-led" (immediate value proposition); narrative problem identification -> solution demonstration -> benefit reinforcement; offer: value demonstration without explicit pricing
+- ad-rivaltwo-v0: hook "urgency-led" (time-sensitive discount); narrative urgency introduction -> discount presentation -> call to action; offer: discount with time-limited framing
+- yt-101: hook "identity-led" (insufficient metadata: transcript unavailable); narrative insufficient metadata: transcript unavailable; offer: insufficient metadata: transcript unavailable
+- yt-102: hook "identity-led" (insufficient metadata: transcript unavailable); narrative insufficient metadata: transcript unavailable; offer: insufficient metadata: transcript unavailable
+- yt:-adZkEIXQnc: hook "curiosity" (side-by-side comparison); narrative introduce both products -> compare features and performance -> highlight differences and similarities -> conclude with recommendation; offer: insufficient metadata: transcript unavailable
+- yt:CF9dlrU1Jo8: hook "identity-led" (barista skills); narrative introduce cleaning and maintenance importance -> demonstrate step-by-step cleaning process -> show maintenance tips -> conclude with benefits of proper care; offer: insufficient metadata: transcript unavailable
+- yt:Fwb9na93n2M: hook "identity-led" (how-to guide); narrative introduce product -> demonstrate step-by-step usage -> highlight key features -> conclude with benefits
+… [truncated]
+  [sampling calls: 3; last modelPreferences: {"costPriority":0.5,"speedPriority":0.4,"intelligencePriority":0.7}]
+  ✔ opportunity ranking succeeded
+  ✔ ranked opportunities returned with separated scores
+  ✔ cross-source evidence discipline intact (paid + organic refs; fixtures use yt-*, real uploads yt:*)
+  ✔ mission report composed
+  ✔ report states the host-routed extraction honestly
+# Marketing intelligence report — mission-w3-2-bridge
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (2)
+
+- Wacaco [confirmed] — Wacaco manufactures portable espresso makers like the Minipresso, directly competing in the same product category for coffee drinkers on the go.
+
+- AeroPress [confirmed] — While primarily a coffee maker rather than strictly an espresso maker, the AeroPress is a popular portable brewing option for commuting coffee drinkers in the same age range.
+
+## Data coverage (explicit gaps, never silently filled)
+
+- [available] organic-uploads:Wacaco (connector:youtube-public) — keyless uploads RSS resolved for channel UC-y91EU3KtDG_yZuSxeMI6w; current-snapshot view counts included
+
+- [partial] creative-metadata:Wacaco (connector:youtube-public) — oEmbed metadata sampled for 1 of 15 feed entries (bounded requests)
+
+- [unavailable] organic-uploads:AeroPress (connector:youtube-public) — not resolvable through permitted public routes in this run: coverage_gap — channel 'AeroPress' not found through public routes (HTTP 404)
+
+- [unavailable] video-statistics-history:youtube (connector:youtube-public) — keyless routes expose current-snapshot counts only; per-video historical time series require the key-based Data API (unverified — no credentials in this environment)
+
+- [not_connected] private-analytics:youtube (connector:youtube-public) — creator private analytics require an authorized account connection (W6 scope)
+
+- [available] organic-content:youtube (sample-platform) — publicly accessible posts, observable engagement and timestamps
+
+- [restricted] competitor-ad-library:meta (sample-adlib) — coverage restricted by source, country, date and advertiser access
+
+- [not_connected] private-conversion-performance (sample-adlib) — requires advertiser account access, measurement integrations or supplied reports
+
+Conclusion: Available evidence supports a preliminary creative hypothesis; it does not support a definitive ranking of competitors by sales or ROAS.
+
+## Performance signals (objective-appropriate, like-for-like)
+
+- ad-rivalone-v0: [PROXY] impressions (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on impressions (latest 31000)
+
+- ad-rivaltwo-v0: [PROXY] impressions (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on impressions (latest 11000)
+
+- yt-101: [PROXY] views (objective
+… [truncated]
+  ✔ sampling channel used for discovery + extraction + synthesis (10 calls)
+
+== phase: host declines every sampling request (fallback honesty) ==
+  ✔ mission started (demo mode: real organic side + labeled synthetic paid side)
+  ✔ competitor discovery returned candidates
+  ✔ research run through the verified connector chain
+  ✔ idempotent ingest still holds (W2 gate through the plugin chain)
+  ✔ creative analysis succeeded
+  ✔ feature sets extracted for observed subjects
+  ✔ declined host → labeled heuristic fallback with stamped reason in EVERY record
+Creative feature extraction (mission-w3-2-declined): 2 ad + 17 organic feature sets.
+Extraction models used: heuristic:multimodal (fallback: MCP error -32603: sampling declined by host policy (evidence decline phase))
+
+- ad-rivalone-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof -> discount-close; offer: percentage discount with deadline
+- ad-rivaltwo-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof -> discount-close; offer: percentage discount with deadline
+- yt-101: hook "creator-led demonstration" (identity-led); narrative problem -> in-use demo -> results; offer: implicit value, soft cta
+- yt-102: hook "creator-led personal benefit reveal" (identity-led); narrative problem -> in-use demo -> results; offer: implicit value, soft cta
+- yt:-adZkEIXQnc: hook "creator-led demonstration" (identity-led); narrative problem -> in-use demo -> results; offer: implicit value, soft cta
+- yt:CF9dlrU1Jo8: hook "creator-led demonstration" (identity-led); narrative problem -> in-use demo -> results; offer: implicit value, soft cta
+- yt:Fwb9na93n2M: hook "creator-led demonstration" (identity-led); narrative problem -> in-use demo -> results; offer: implicit value, soft cta
+- yt:IT2DzXJomBk: hook "creator-led demonstration" (identity-led); narrative problem -> in-use demo -> results; offer: implicit value, soft cta
+- yt:LBCWovZBhW4: hook "creator-led demonstration" (identity-led); narrative problem -> in-use demo -> results; offer: implicit value, soft cta
+- yt:QJCXDDxmRGA: hook "creator-led demonstration" (identity-led); narrative 
+… [truncated]
+  [sampling calls: 3; last modelPreferences: undefined]
+  ✔ opportunity ranking succeeded
+  ✔ ranked opportunities returned with separated scores
+  ✔ cross-source evidence discipline intact (paid + organic refs; fixtures use yt-*, real uploads yt:*)
+  ✔ mission report composed
+  ✔ report states the fallback honestly
+# Marketing intelligence report — mission-w3-2-declined
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (2)
+
+- Wacaco [confirmed] — overlapping product category and audience with the described offer
+
+- AeroPress [confirmed] — overlapping product category and audience with the described offer
+
+## Data coverage (explicit gaps, never silently filled)
+
+- [available] organic-uploads:Wacaco (connector:youtube-public) — keyless uploads RSS resolved for channel UC-y91EU3KtDG_yZuSxeMI6w; current-snapshot view counts included
+
+- [partial] creative-metadata:Wacaco (connector:youtube-public) — oEmbed metadata sampled for 1 of 15 feed entries (bounded requests)
+
+- [unavailable] organic-uploads:AeroPress (connector:youtube-public) — not resolvable through permitted public routes in this run: coverage_gap — channel 'AeroPress' not found through public routes (HTTP 404)
+
+- [unavailable] video-statistics-history:youtube (connector:youtube-public) — keyless routes expose current-snapshot counts only; per-video historical time series require the key-based Data API (unverified — no credentials in this environment)
+
+- [not_connected] private-analytics:youtube (connector:youtube-public) — creator private analytics require an authorized account connection (W6 scope)
+
+- [available] organic-content:youtube (sample-platform) — publicly accessible posts, observable engagement and timestamps
+
+- [restricted] competitor-ad-library:meta (sample-adlib) — coverage restricted by source, country, date and advertiser access
+
+- [not_connected] private-conversion-performance (sample-adlib) — requires advertiser account access, measurement integrations or supplied reports
+
+Conclusion: Available evidence supports a preliminary creative hypothesis; it does not support a definitive ranking of competitors by sales or ROAS.
+
+## Performance signals (objective-appropriate, like-for-like)
+
+- ad-rivalone-v0: [PROXY] impressions (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on impressions (latest 31000)
+
+- ad-rivaltwo-v0: [PROXY] impressions (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on impressions (latest 11000)
+
+- yt-101: [PROXY] views (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on views (latest 52000)
+
+- yt-102: [PROXY] views (objective metric 'attributedCo
+… [truncated]
+  ✔ sampling requests issued and refused over the wire (9 calls)
+
+Done.
+

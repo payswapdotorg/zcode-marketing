@@ -1,7 +1,12 @@
 // MCP Port - Model Context Protocol adapter boundary
 
 import type { McpServerFailureKind, OfficialMcpAuthPortFailureReason } from "@zcode/shared";
-import type { McpAppsToolVisibility, McpToolUiDescriptor } from "@zcode/shared/mcp-apps";
+import type {
+  McpAppsSamplingParams,
+  McpAppsSamplingResult,
+  McpAppsToolVisibility,
+  McpToolUiDescriptor,
+} from "@zcode/shared/mcp-apps";
 import type { JsonSchema } from "../model/index.js";
 import type { TraceContext } from "../tracing/tracer.js";
 
@@ -424,6 +429,29 @@ export interface McpElicitationPort {
     request: McpElicitationRequest,
     options?: { signal?: AbortSignal },
   ): Promise<McpElicitationResult>;
+}
+
+/**
+ * MCP sampling（server → client `sampling/createMessage`）交给宿主模型系统的端口。
+ * 复用 MCP Apps 的采样载荷/结果契约（@zcode/shared/mcp-apps），宿主把它路由到既有
+ * `sampleModel` 运行时方法：会话模型经 provider registry 解析、用量记账、可中止。
+ * 拒绝以 `{ action: "decline", reason }` 表达（无法归属会话、超预算等），adapter 侧
+ * 映射为 JSON-RPC error 返回给 server——sampling 结果没有协议级 decline。
+ */
+export interface McpSamplingRequest {
+  serverName: string;
+  /** 发起采样时该 server 正在执行的工具调用；没有则无法归属会话，端口应拒绝。 */
+  trace?: McpElicitationTrace;
+  request: McpAppsSamplingParams;
+}
+export type McpSamplingResult =
+  | ({ action: "accept" } & McpAppsSamplingResult)
+  | { action: "decline"; reason?: string };
+export interface McpSamplingPort {
+  requestModelSampling(
+    request: McpSamplingRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<McpSamplingResult>;
 }
 
 export interface McpPort {

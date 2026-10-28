@@ -31,6 +31,37 @@ export async function main(): Promise<void> {
   process.once('SIGINT', () => void close());
   process.stdin.once('end', () => void close());
   await server.connect(new StdioServerTransport());
+
+  // W3-2: bind a lazily-checked sampling client. server.connect() resolves
+  // before the client's initialize handshake arrives, so the capability is
+  // checked PER CALL, not at a fixed startup point. A host that never declared
+  // `sampling` fails the check, the error reaches FallbackModelPort, and the
+  // labeled heuristic adapter runs with the reason stamped into provenance —
+  // visible, never silent. Structured extraction that DOES go through routes
+  // to the host's provider system (`zcode:routed:<model>` provenance).
+  runtime.setSamplingClient({
+    createMessage: async (request) => {
+      const capabilities = server.server.getClientCapabilities();
+      if (!capabilities?.sampling) {
+        throw new Error('host did not declare the sampling capability');
+      }
+      const result = await server.server.createMessage({
+        messages: request.messages,
+        ...(request.systemPrompt !== undefined ? { systemPrompt: request.systemPrompt } : {}),
+        maxTokens: request.maxTokens,
+        ...(request.modelPreferences !== undefined ? { modelPreferences: request.modelPreferences } : {}),
+      });
+      return {
+        role: 'assistant',
+        model: result.model,
+        content:
+          result.content.type === 'text'
+            ? { type: 'text', text: result.content.text }
+            : { type: 'text', text: JSON.stringify(result.content) },
+        stopReason: result.stopReason ?? 'unknown',
+      };
+    },
+  });
 }
 
 // Standalone Node process entry (also used by the W3 chain verification script).

@@ -268,7 +268,7 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
       "../../marketing-plugin",
       "../../../marketing-plugin",
     ],
-    version: "0.1.0",
+    version: "0.2.0",
   },
   {
     // 沿用原聚合文档插件的官方搜图能力，仅拆出独立开关；认证仍由官方 MCP adapter 注入。

@@ -1,6 +1,6 @@
 # MARKETING-ARCHITECTURE-LOCK
 
-> Authoritative architectural boundaries for the marketing domain layer. Violations block merge. Owned by the TL. Last updated: 2026-10-28 (W3-1: marketing-plugin registered in the CLI chain; managed module `marketing-plugin`).
+> Authoritative architectural boundaries for the marketing domain layer. Violations block merge. Owned by the TL. Last updated: 2026-10-29 (W3-2: real-model bridge — MCP sampling channel through the host provider system; managed module `mcp-server-sampling`).
 
 ## The one architectural decision that matters most
 
@@ -36,9 +36,10 @@ packages/marketing/src/domain/       Canonical records, value objects, contracts
 packages/marketing/src/app/          Temporal store, capability catalog, workflows, ports
 packages/marketing/src/adapters/     Connector adapters, model adapters, persistence adapters
 apps/zcode-cli/packages/marketing-plugin/   CLI plugin exposing marketing tools to the runtime (W3-1, live: official plugin `marketing`, stdio MCP server; contract in its `src/contract.ts`)
+apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-server-sampling/  Host-side sampling delegation for MCP servers (W3-2, live: managed module `mcp-server-sampling`, layer app; routes `sampling/createMessage` to the existing runtime `sampleModel` — provider-registry session model, usage accounting, per-session budget; never a side-channel)
 ```
 
-`packages/marketing` is registered in `architecture-policy.yaml` as a managed module with layering `domain → app → adapters` (mirrors the `storage` module pattern), and `apps/zcode-cli/packages/marketing-plugin` as a managed module with layer `app` (mirrors the `office-runtime` plugin pattern; `requires: marketing`, owner `marketing-tl`). Public entrypoints are explicit; cross-package imports must use public entrypoints and existing path aliases only.
+`packages/marketing` is registered in `architecture-policy.yaml` as a managed module with layering `domain → app → adapters` (mirrors the `storage` module pattern), `apps/zcode-cli/packages/marketing-plugin` as a managed module with layer `app` (mirrors the `office-runtime` plugin pattern; `requires: marketing`, owner `marketing-tl`), and `apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-server-sampling` as a managed module with layer `app` (mirrors the `mcp-ui` pattern; `requires: zcode-cli, shared, mcp-apps-protocol`, owner `marketing-tl`). Public entrypoints are explicit; cross-package imports must use public entrypoints and existing path aliases only.
 
 ## Migration and change rules
 

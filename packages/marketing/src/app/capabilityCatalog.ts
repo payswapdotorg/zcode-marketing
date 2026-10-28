@@ -11,10 +11,19 @@
  */
 import type { ModelCapability, ModelPort, ModelTask } from './ports.js';
 
-export interface RoutingDecision {
+export interface RoutingChoice {
   modelRef: string;
   /** Why this model: capability match, cost, reliability — auditable. */
   reason: string;
+}
+
+export interface RoutingDecision extends RoutingChoice {
+  /** What actually executed the task (adapter-reported). With the real-model
+   * bridge the declared modelRef is the host-routed capability while the
+   * executed model is the session model the host selected — e.g.
+   * 'zcode:routed:glm-4.7'; a fallback records the stand-in + reason.
+   * Provenance MUST use this field, never the declared modelRef. */
+  executedModelRef: string;
 }
 
 const MIN_RELIABILITY: Record<ModelTask, number> = {
@@ -34,7 +43,7 @@ export class CapabilityCatalog {
   }
 
   /** Cheapest suitable capability meeting the task's reliability bar, with fallback. */
-  route(task: ModelTask): RoutingDecision {
+  route(task: ModelTask): RoutingChoice {
     const eligible = this.modelPort.capabilities
       .filter((c) => c.tasks.includes(task))
       .sort((a, b) => a.relativeCost - b.relativeCost);
@@ -62,6 +71,9 @@ export class CapabilityCatalog {
   }> {
     const routing = this.route(task);
     const result = await this.modelPort.runStructured(task, input, outputSchema);
-    return { value: result.value, routing };
+    return {
+      value: result.value,
+      routing: { ...routing, executedModelRef: result.modelRef },
+    };
   }
 }

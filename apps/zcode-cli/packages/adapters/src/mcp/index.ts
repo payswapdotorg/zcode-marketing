@@ -39,6 +39,7 @@ import type {
   OfficialMcpAuthFailureReason,
   OfficialMcpAuthHeadersPort,
   OfficialMcpTrustedOriginRegistry,
+  McpSamplingPort,
 } from "@zcode/contracts";
 import {
   McpResourceSubscribeUnsupportedError,
@@ -50,7 +51,7 @@ import {
   type McpServerFailureKind,
   type OfficialMcpAuthFailureKind,
 } from "@zcode/shared";
-import { buildMcpAppsClientCapabilities } from "@zcode/shared/mcp-apps";
+import { buildMcpAppsClientCapabilities, mcpAppsSamplingParamsSchema } from "@zcode/shared/mcp-apps";
 import { createHash, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -141,6 +142,8 @@ export interface CreateMcpAdapterOptions {
   workingDirectory?: string;
   /** 有此端口才向 server 宣告 elicitation 能力；缺省时 server 的 elicitation/create 收到 method not found。 */
   elicitation?: McpElicitationPort;
+  /** 有此端口才向 server 宣告 sampling 能力；缺省时 server 的 sampling/createMessage 收到 method not found。 */
+  sampling?: McpSamplingPort;
   /** server → client 通知（资源更新 / 列表变化 / 工具列表变化 / 日志）的出口；缺省只记 debug。 */
   notifications?: McpNotificationPort;
 }
@@ -276,6 +279,7 @@ class NodeMcpAdapter implements McpPort {
   private readonly records = new Map<string, McpServerRecord>();
   private readonly workingDirectory?: string;
   private readonly elicitation?: McpElicitationPort;
+  private readonly sampling?: McpSamplingPort;
   private readonly notifications?: McpNotificationPort;
   /** 资源订阅登记表 serverName → uri → subscriberKey；唯一 owner，连接层计数。 */
   private readonly resourceSubscriptions = new McpResourceSubscriptionRegistry();
@@ -299,6 +303,7 @@ class NodeMcpAdapter implements McpPort {
     this.telemetry = options.telemetry;
     this.workingDirectory = options.workingDirectory;
     this.elicitation = options.elicitation;
+    this.sampling = options.sampling;
     this.notifications = options.notifications;
   }
 
@@ -1114,7 +1119,52 @@ class NodeMcpAdapter implements McpPort {
     });
   }
 
-  /** 调用期间登记 trace，server 在这段时间发起的 elicitation 才能归属到会话 / 工具行。 */
+  /**
+   * server 主动 sampling/createMessage：与 elicitation 同一归属纪律——必须挂在该 server
+   * 当前正在执行的工具调用上（activeCallTraces），载荷用宿主与 MCP Apps 共用的采样
+   * zod 契约验证（同一份 schema，两侧不会一放一拒）。端口拒绝/无法归属 → JSON-RPC error，
+   * 采样结果没有协议级 decline，server 侧按错误处理（例如记录后回退）。
+   */
+  private installSamplingHandler(client: McpClient, serverName: string): void {
+    const port = this.sampling;
+    const setRequestHandler = (client as unknown as { setRequestHandler?: unknown })
+      .setRequestHandler;
+    if (!port || typeof setRequestHandler !== "function") return;
+    (
+      client as unknown as {
+        setRequestHandler(
+          method: "sampling/createMessage",
+          handler: (request: { params: unknown }) => Promise<unknown>,
+        ): void;
+      }
+    ).setRequestHandler("sampling/createMessage", async (request) => {
+      const trace = this.activeCallTraces.get(serverName);
+      if (!trace) {
+        // 空闲期主动采样无法归属会话/工具行：拒绝而不是猜——与 elicitation 同一安全边界。
+        throw new Error(
+          `sampling request from '${serverName}' cannot be attributed to an active tool call`,
+        );
+      }
+      const params = mcpAppsSamplingParamsSchema.parse(request.params);
+      const result = await port.requestModelSampling({
+        serverName,
+        trace,
+        request: params,
+      });
+      if (result.action === "decline") {
+        throw new Error(result.reason ?? `host declined sampling for '${serverName}'`);
+      }
+      const { action: _action, ...sampling } = result;
+      return {
+        role: sampling.role,
+        model: sampling.model,
+        content: sampling.content,
+        stopReason: sampling.stopReason,
+      };
+    });
+  }
+
+  /** 调用期间登记 trace，server 在这段时间发起的 elicitation/sampling 才能归属到会话 / 工具行。 */
   private async callToolOnClient(
     client: McpClient,
     request: McpCallToolRequest,
@@ -1541,10 +1591,13 @@ class NodeMcpAdapter implements McpPort {
             ...buildMcpAppsClientCapabilities(),
             // 只宣告 form 模式（url 模式不做）；server 据此选择 elicitation 形态。
             ...(this.elicitation ? { elicitation: { form: {} } } : {}),
+            // sampling：有端口才宣告；server 据此决定能否发起 sampling/createMessage。
+            ...(this.sampling ? { sampling: {} } : {}),
           },
         },
       );
       this.installElicitationHandler(client, name);
+      this.installSamplingHandler(client, name);
       this.installNotificationHandlers(client, name);
       this.updateCurrentRecord(name, generation, {
         client,

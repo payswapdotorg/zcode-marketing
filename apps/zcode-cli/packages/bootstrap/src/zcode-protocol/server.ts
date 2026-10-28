@@ -12,9 +12,12 @@ import type { BrowserControlPort } from "@zcode/contracts";
 import type {
   McpElicitationRequest,
   McpElicitationResult,
+  McpSamplingRequest,
+  McpSamplingResult,
   McpServerNotification,
 } from "@zcode/contracts";
 import { requestMcpElicitation } from "./interaction-broker.js";
+import { requestMcpSampling } from "./mcp-server-sampling/index.js";
 import { InMemoryWorkspaceHookPolicyProvider } from "@zcode/core";
 import {
   V4_METHODS,
@@ -251,6 +254,14 @@ export class ZCodeProtocolAgentServer {
     options?: { signal?: AbortSignal },
   ): Promise<McpElicitationResult> {
     return requestMcpElicitation(this.context, request, options);
+  }
+
+  /** MCP server 发起的 sampling/createMessage → 既有 sampleModel 运行时路径（受控，非旁路）。 */
+  requestMcpSampling(
+    request: McpSamplingRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<McpSamplingResult> {
+    return requestMcpSampling(this.context, request, options);
   }
 
   /** MCP server 通知 → 会话 live 事件 / agent 日志。 */

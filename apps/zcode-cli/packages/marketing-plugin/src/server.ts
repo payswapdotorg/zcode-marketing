@@ -27,7 +27,7 @@ import type { OpportunityScore } from '@zcode/marketing';
 import { MarketingRuntime, MarketingToolError, missionIndexEntry, researchMode } from './runtime.js';
 
 export const PLUGIN_NAME = 'marketing';
-export const PLUGIN_VERSION = '0.1.0';
+export const PLUGIN_VERSION = '0.2.0';
 export const SERVER_NAME = 'marketing';
 
 const textResult = (text: string, structuredContent?: Record<string, unknown>) => ({
@@ -297,7 +297,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
           (f) => `- ${f.subjectRef}: hook "${f.hooks[0]?.hook}" (${f.hooks[0]?.attentionPattern}); narrative ${f.narrative.join(' -> ')}; offer: ${f.offerStructure}`,
         ),
         '',
-        'Note: heuristic extraction adapters are labeled in every feature set; capability-routed models replace them without workflow changes (MARKETING-CAPABILITY-MAP.md).',
+        'Provenance is recorded per feature set (extractionModelRef): `zcode:routed:<model>` = host-routed session model through the sampling channel; `heuristic:*` = labeled stand-in adapter (no host sampling capability, or fallback after a channel failure).',
       ].join('\n');
       return { text, structured: { adFeatures, organicFeatures } };
     },
@@ -372,9 +372,11 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
       let opportunities: OpportunityScore[] = [];
       let opportunityNote =
         'No ranked opportunities: the paid x organic intersection needs a verified ad-intelligence source — blocked on credentials (W1-3(b)). Run in demo mode to see the loop with labeled synthetic fixtures.';
+      let extractionModelRefs: string[] = [];
       if (mission.store.allAds().length > 0) {
         const adFeatures = await mission.extractFeatures(mission.store.allAds());
         const organicFeatures = await mission.extractFeatures(mission.store.allOrganic());
+        extractionModelRefs = [...new Set([...adFeatures, ...organicFeatures].map((f) => f.extractionModelRef))];
         opportunities = await mission.rankOpportunities(adFeatures, organicFeatures);
         opportunityNote = '';
       }
@@ -382,6 +384,24 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
         entry.researchMode === 'demo'
           ? 'DEMO MODE: fixture ads and the fixture organic entries (yt-101, yt-102) come from the labeled synthetic sample connector; public YouTube entries (yt:<video id>) are real. Every record carries its source id.'
           : 'LIVE MODE: verified public sources only.';
+      const extractionNote = (() => {
+        const refs = extractionModelRefs;
+        if (refs.length === 0) {
+          return '- Structured extraction provenance: no model extraction ran for this report (no ranked opportunities to attribute).';
+        }
+        const routed = refs.filter((r) => r.startsWith('zcode:routed:'));
+        const fallback = refs.filter((r) => r.includes('(fallback:'));
+        if (routed.length > 0 && fallback.length === 0) {
+          return '- Structured extraction ran through the host-routed session model (sampling channel); provenance recorded per record (extractionModelRef).';
+        }
+        if (routed.length > 0 && fallback.length > 0) {
+          return `- Structured extraction partially fell back to the labeled heuristic adapter (channel failure); provenance per record: ${fallback.join('; ')}.`;
+        }
+        if (routed.length === 0 && fallback.length > 0) {
+          return `- Structured extraction fell back entirely to the labeled heuristic adapter (host sampling channel unavailable or declined); provenance per record: ${fallback.join('; ')}.`;
+        }
+        return '- Labeled heuristic adapters performed the structured extraction (no host sampling capability detected); provenance recorded per record.';
+      })();
       const sections: string[] = [];
       sections.push(
         `# Marketing intelligence report — ${entry.missionId}`,
@@ -421,7 +441,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
       sections.push(
         '## Limitations (honest)',
         `- ${syntheticNote}`,
-        '- Heuristic model adapters perform the structured extraction; provenance is recorded per record (extractionModelRef).',
+        extractionNote,
         '- View counts are current-snapshot public stats, not full history; velocity uses comparable 7-day windows.',
         entry.researchMode === 'live'
           ? '- Ad intelligence: no verified source connected yet (W1-3(b) open blocker).'

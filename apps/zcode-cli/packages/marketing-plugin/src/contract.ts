@@ -55,4 +55,15 @@ export interface MarketingPluginContract {
     missionIndex: typeof MARKETING_MISSIONS_INDEX;
     missionDb: typeof MARKETING_MISSION_DB;
   };
+  /**
+   * 模型通道契约（W3-2）：结构化抽取只经宿主 MCP `sampling/createMessage`
+   * 通道（宿主声明 sampling 能力才会绑定）；没有该通道或通道失败时回退到
+   * 已标注的启发式适配器，回退原因写进每条记录的 provenance
+   * （extractionModelRef），绝不静默替换。永不旁路直连 provider。
+   */
+  modelChannel: {
+    provenancePrefix: "zcode:routed:";
+    fallbackMarker: "(fallback:";
+    heuristicPrefix: "heuristic:";
+  };
 }

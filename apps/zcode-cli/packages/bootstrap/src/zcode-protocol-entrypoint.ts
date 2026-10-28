@@ -1,5 +1,11 @@
 import { createConfig } from "@zcode/adapters/config";
-import type { McpElicitationPort, McpNotificationPort } from "@zcode/contracts";
+import type {
+  McpElicitationPort,
+  McpNotificationPort,
+  McpSamplingPort,
+  McpSamplingRequest,
+  McpSamplingResult,
+} from "@zcode/contracts";
 import { createNodeModelSelectionFacade } from "@zcode/provider-node";
 import { createNodeLoggerFactory } from "@zcode/adapters/logging";
 import {
@@ -239,6 +245,7 @@ export async function runZCodeProtocolAgent(
     let elicitationServer: {
       requestMcpElicitation: McpElicitationPort["requestElicitation"];
       handleMcpNotification: McpNotificationPort["onNotification"];
+      requestMcpSampling: McpSamplingPort["requestModelSampling"];
     } | null = null;
     mcpConnectionPool =
       configResult.config.features.mcp === false
@@ -254,6 +261,20 @@ export async function runZCodeProtocolAgent(
             notifications: {
               onNotification: (notification) =>
                 elicitationServer?.handleMcpNotification(notification),
+            },
+            // server 采样（sampling/createMessage）延迟绑定到协议 server：会话归属与
+            // sampleModel 委托都在 server 就绪后生效；未就绪时拒绝而不是猜会话。
+            sampling: {
+              requestModelSampling: (
+                request: McpSamplingRequest,
+                samplingOptions?: { signal?: AbortSignal },
+              ): Promise<McpSamplingResult> =>
+                elicitationServer
+                  ? elicitationServer.requestMcpSampling(request, samplingOptions)
+                  : Promise.resolve({
+                      action: "decline" as const,
+                      reason: "protocol server not ready",
+                    }),
             },
             clientVersion: options.version ?? "0.0.0",
             env: options.env,
