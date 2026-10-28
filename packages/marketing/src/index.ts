@@ -19,14 +19,13 @@
  */
 export * from './domain/records.js';
 export { TemporalStore } from './app/temporalStore.js';
-export type { IngestResult } from './app/temporalStore.js';
+export type { IngestResult, TemporalStorePort } from './app/temporalStore.js';
 export { CapabilityCatalog } from './app/capabilityCatalog.js';
 export type { RoutingDecision } from './app/capabilityCatalog.js';
 export { MarketingMission } from './app/workflows.js';
 export type { OpportunityScore } from './app/workflows.js';
 export type {
   ConnectorError,
-  ConnectorFailure,
   ConnectorCapabilities,
   ConnectorMeta,
   CoverageSlice,
@@ -43,4 +42,7 @@ export type {
 export { ConnectorFailure } from './app/ports.js';
 export { SampleConnector } from './adapters/sampleConnector.js';
 export { HeuristicModel } from './adapters/heuristicModel.js';
+export { SqliteTemporalStore } from './adapters/sqliteStore.js';
+export { YoutubePublicConnector, channelCandidate } from './adapters/sources/youtubePublic.js';
+export type { FetchLike } from './adapters/sources/youtubePublic.js';
 export { paidFixtures, organicFixtures, groundTruth } from './adapters/fixtures.js';

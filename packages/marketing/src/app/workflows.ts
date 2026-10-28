@@ -31,6 +31,7 @@ import type {
 import type { CapabilityCatalog } from './capabilityCatalog.js';
 import type { MarketingConnector } from './ports.js';
 import { TemporalStore } from './temporalStore.js';
+import type { TemporalStorePort } from './temporalStore.js';
 
 let counter = 0;
 const nextId = (prefix: string): string => `${prefix}-${(counter += 1)}`;
@@ -78,7 +79,7 @@ export interface OpportunityScore {
 }
 
 export class MarketingMission {
-  readonly store = new TemporalStore();
+  readonly store: TemporalStorePort;
   private readonly startedAt: string;
 
   constructor(
@@ -86,7 +87,10 @@ export class MarketingMission {
     private readonly connector: MarketingConnector,
     private readonly catalog: CapabilityCatalog,
     private readonly now: () => string,
+    /** Production wiring injects the SQLite persistence adapter here; default in-memory. */
+    store: TemporalStorePort = new TemporalStore(),
   ) {
+    this.store = store;
     this.startedAt = this.now();
   }
 

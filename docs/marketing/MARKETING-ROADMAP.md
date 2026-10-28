@@ -1,23 +1,23 @@
 # MARKETING-ROADMAP
 
-> Phases, dependencies, deliverables, acceptance gates, and open blockers. Wave gates are non-negotiable; a wave is complete when its gate passes with recorded evidence (see WORK-REGISTRY.md for live status). Last updated: 2026-10-28.
+> Phases, dependencies, deliverables, acceptance gates, and open blockers. Wave gates are non-negotiable; a wave is complete when its gate passes with recorded evidence (see WORK-REGISTRY.md for live status). Last updated: 2026-10-28 (full-env verification closed; W2 complete; W1 organic-side verified).
 
 ## Wave plan
 
 ### W0 — Upstream audit and preservation baseline
 - Inspect the fork point, existing architecture, runtime, permissions, extension mechanisms, persistence, build and tests. Establish a regression baseline before modifying anything.
 - **Exit gate:** the TL can demonstrate the existing runtime and document which capabilities must remain intact.
-- **Status:** ✅ Complete (2026-10-28). Audit recorded in `FEATURE-PRESERVATION-MATRIX.md`; architecture boundaries frozen in `MARKETING-ARCHITECTURE-LOCK.md`. Runtime not executed in this sandbox (no pnpm bootstrap); baseline is source-inspection-based and must be re-confirmed by running `pnpm typecheck && pnpm lint && pnpm architecture:check --changed` and the upstream suites in a full environment at W1 integration time.
+- **Status:** ✅ Complete (2026-10-28). Audit recorded in `FEATURE-PRESERVATION-MATRIX.md`; architecture boundaries frozen in `MARKETING-ARCHITECTURE-LOCK.md`. Full-environment re-verification executed and recorded on 2026-10-28: `evidence/2026-10-28-full-env-verification.txt` (pnpm bootstrap, root `pnpm typecheck` incl. `packages/marketing`, `pnpm lint`, `pnpm architecture:check --changed`, `pnpm test:architecture`, `pnpm db:schema:check` — all pass, limitations stated in the evidence file).
 
 ### W1 — Architecture contracts and data-access proof
 - Freeze marketing domain contracts, source-coverage model, capability-routing design, security boundaries. Test real access to candidate data sources before making them foundational.
 - **Exit gate:** at least one viable organic-content source and one suitable ad-intelligence source for the intended market have verified access paths and repeatable test results.
-- **Status:** 🟡 In progress. Contracts frozen and implemented (`packages/marketing/src/domain`, `app/ports.ts`, connector contract, capability catalog). Source verification tests for YouTube public data + one ad source are the remaining gate items (Worker A; sandbox network/credentials dependent).
+- **Status:** 🟡 In progress. Contracts frozen and implemented (`packages/marketing/src/domain`, `app/ports.ts`, connector contract, capability catalog). **Organic side verified 2026-10-28:** keyless YouTube public routes (uploads RSS + oEmbed) — `connector:youtube-public` passed a live repeatable test through the full connector contract (`evidence/2026-10-28-w1-source-access-youtube-public.txt`). **Ad side remains open:** Meta Ad Library probe confirms the access path exists and requires credentials; W1-3(b) needs a credentialed, repeatable test + the intended-market/geography decision before the wave gate can close.
 
 ### W2 — Temporal data foundation
 - Connector framework, normalized entities, provenance, immutable metric observations, historical snapshots, coverage reporting, backfill where permitted.
 - **Exit gate:** ingesting the same evidence twice is safe, metric changes are recorded, and an as-of query reproduces the observations actually available at that time.
-- **Status:** 🟡 In progress. `app/temporalStore.ts` implements idempotent ingest, observation deltas, as-of queries, coverage ledger; conformance via the sample connector + demo loop run. SQLite persistence adapter (production wiring) pending full-environment integration.
+- **Status:** ✅ Complete (2026-10-28). `app/temporalStore.ts` defines `TemporalStorePort`; the in-memory implementation and the production SQLite persistence adapter (`adapters/sqliteStore.ts`, `node:sqlite`, repo-style immutable versioned migrations) both pass the identical gate set — idempotent ingest, duplicate no-op, explicit revisions preserved in an append-only revision table, as-of queries, velocity, plus close/reopen persistence (`evidence/2026-10-28-w2-sqlite-persistence-conformance.txt`). MarketingMission accepts an injected store; workflows are storage-agnostic.
 
 ### W3 — First end-to-end intelligence workflow
 - Product onboarding form, competitor discovery, platform research, evidence viewer, creative feature extraction, cross-source opportunity ranking.
@@ -52,8 +52,7 @@
 
 | Blocker | Owner | Notes |
 | --- | --- | --- |
-| Full-environment verification (pnpm bootstrap, typecheck/lint/architecture check, upstream suites) | TL | Sandbox lacks pnpm + full toolchain; must run in a complete dev environment before W1 gate can close |
-| YouTube public API access verification (quota + terms test script) | Worker A | Needs API key + repeatable test committed to `evidence/` |
-| Ad-intelligence source selection for first market (Meta Ad Library region scope vs TikTok EU scope decision) | Worker A + TL | Decision blocked on W1 access tests + intended market definition |
-| Marketing plugin registration in CLI runtime | TL | W3 entry; follows tool change chain spec |
+| ~~Full-environment verification (pnpm bootstrap, typecheck/lint/architecture check, upstream suites)~~ | TL | ✅ Closed 2026-10-28 — executed in a complete bootstrapped environment, all gates pass; truthful record incl. limitations: `evidence/2026-10-28-full-env-verification.txt` |
+| Ad-intelligence source selection for first market (Meta Ad Library region scope vs TikTok EU scope decision) | Worker A + TL | Meta Ad Library access path probed (reachable, credentials required); decision blocked on a credentialed W1-3(b) test + intended market/geography definition |
+| Marketing plugin registration in CLI runtime | TL | W3 entry; follows tool change chain spec `apps/zcode-cli/docs/design/v2/tool/00-tool-change-chain.md` |
 | Real publishing sandbox account | Worker A | W5 entry |

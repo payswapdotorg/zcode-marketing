@@ -1,6 +1,6 @@
 # MARKETING-DATA-SOURCES
 
-> Source-by-source record of API availability, permissions, regions, fields, freshness, retention, quotas, and limitations. Owned by Worker A (platform access), TL-approved. Connector implementations must be built **only** from entries marked "access path verified". Last updated: 2026-10-28 (W1 desk audit; verification column records what has actually been tested).
+> Source-by-source record of API availability, permissions, regions, fields, freshness, retention, quotas, and limitations. Owned by Worker A (platform access), TL-approved. Connector implementations must be built **only** from entries marked "access path verified". Last updated: 2026-10-28 (W1 live verification: YouTube keyless public routes verified; Meta Ad Library probed — credentials still required).
 
 ## Why this file exists
 
@@ -22,8 +22,8 @@ Constraints that apply to every method: never bypass authentication controls, CA
 ### Meta Ad Library (+ associated transparency interfaces)
 - **Use for:** eligible ads, advertisers, creative variations, delivery history.
 - **Known constraint:** the official interface's commercial-ads coverage is region-limited (documented EU/UK commercial transparency scope over the past year; the multi-year global scope applies to political and social-issue ads). It is **not** a universal commercial-ad archive.
-- **Status:** candidate. Access path NOT yet verified in this fork. Do not build foundational dependencies on it until Worker A records a repeatable test in `evidence/`.
-- **Freshness/retention/quotas:** TBD by Worker A during W1 verification.
+- **Status:** candidate. Access path probed live 2026-10-28: the `ads_archive` API endpoint is reachable and its documented parameters validate, but a request without an access token returns no data (`evidence/2026-10-28-w1-source-access-youtube-public.txt`, Part 2). **Verified conclusion: the access path exists and is repeatable, but requires credentials — not yet verified with data.** Do not build foundational dependencies on it until Worker A records a credentialed, repeatable test in `evidence/`.
+- **Freshness/retention/quotas:** TBD by Worker A during credentialed W1 verification.
 
 ### TikTok Commercial Content API
 - **Use for:** search public ads and commercial content, supported advertiser metadata.
@@ -38,7 +38,13 @@ Constraints that apply to every method: never bypass authentication controls, CA
 ### YouTube Data API (public)
 - **Use for:** discover videos, collect accessible public video statistics.
 - **Known constraint:** public metrics are useful performance signals but do not reveal creators' private analytics.
-- **Status:** **primary organic source candidate for the first vertical slice** (documented public API, key-based access). Verification test pending W1.
+- **Status:** key-based access remains **unverified** (no API credentials in this environment). The keyless subset of public organic data is covered by the verified row below.
+
+### YouTube public metadata — oEmbed + channel uploads RSS (keyless)
+- **Use for:** recent channel uploads (rolling ~15-entry feed), current-snapshot public view counts per video, per-video creative metadata (title, author, thumbnail).
+- **Access:** documented platform endpoints, no credentials: `youtube.com/oembed?url=<video>&format=json`, `youtube.com/feeds/videos.xml?channel_id=<id>`, plus public handle→channel-id resolution. Implemented by `connector:youtube-public` (`packages/marketing/src/adapters/sources/youtubePublic.ts`, capabilities: research ONLY).
+- **Known constraints (reported in every CoverageReport):** feed carries a rolling window of recent uploads, not history; view counts are current snapshots (history requires the key-based Data API); channel resolution works for channel ids and handles, not arbitrary search terms; private analytics stay out of scope (not_connected).
+- **Status:** **Access path verified: 2026-10-28** — live repeatable test `evidence/2026-10-28-w1-source-access-youtube-public.txt` (15 organic records + 15 real view-count observations ingested idempotently through the connector contract; negative control produced an honest coverage gap). Organic-side verification item of W1-3(a) is satisfied by this row; the key-based Data API row above remains the growth path for per-video history.
 
 ### YouTube Analytics API (authorized)
 - **Use for:** deeper metrics for a connected, authorized channel.

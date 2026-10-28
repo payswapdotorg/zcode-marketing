@@ -34,7 +34,7 @@ Three kinds of time, preserved separately and never conflated:
 
 Every observation carries at minimum: `observed_at` (when the system saw it), `published_at` (source event time, when applicable), `ingested_at` (when it entered the store), plus connector version, source record identity, metric semantics (and metric definition version when it matters), applicable region, and retention restrictions on source data.
 
-## Idempotency and immutability rules (implemented in `packages/marketing/src/app/temporalStore.ts`)
+## Idempotency and immutability rules (implemented in `packages/marketing/src/app/temporalStore.ts` — `TemporalStorePort` — and `packages/marketing/src/adapters/sqliteStore.ts` — production SQLite persistence)
 
 - Ingesting the same record twice creates **no** duplicate entity and **no** metric inflation: source identity (`sourceId` + `sourceRecordId`) + observation window deduplicate.
 - Changes are new observations or explicit revisions — **history is never silently rewritten**.

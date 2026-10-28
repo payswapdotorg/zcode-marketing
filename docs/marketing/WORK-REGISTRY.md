@@ -1,6 +1,6 @@
 # WORK-REGISTRY
 
-> Owned work orders, dependencies, status, evidence, commits, and remaining work. No task is complete merely because an agent reports that it finished — completion requires the recorded evidence. Last updated: 2026-10-28.
+> Owned work orders, dependencies, status, evidence, commits, and remaining work. No task is complete merely because an agent reports that it finished — completion requires the recorded evidence. Last updated: 2026-10-28 (W2 closed; W1 organic verified; full-env gates recorded).
 
 ## Roles (blueprint §10)
 
@@ -34,15 +34,16 @@ Shared files are TL-owned or assigned to exactly one worker at a time. Workers i
 - **Notes:** capability-declared (research/analytics/publishing/scheduling/paidAds); `coverage_gap` is a normal result feeding CoverageReport; `policy_violation` aborts without retry; publish() exists iff capabilities.publishing (enforced in demo gate).
 
 ### W1-3 — Source access verification (gate-critical, blocks W1 exit)
-- **Owner:** Worker A · **Status:** ⬜ Open
-- **Deliverables:** repeatable access tests for (a) YouTube public data — organic side, (b) one ad-intelligence source for the intended market (Meta Ad Library region-scope decision vs TikTok EU-scope decision) — results committed under `docs/marketing/evidence/` and rows signed in `MARKETING-DATA-SOURCES.md`.
-- **Blocked by:** API credentials + intended market/geography definition.
+- **Owner:** Worker A · **Status:** 🟡 Organic side verified; ad side blocked on credentials
+- **Deliverables:** repeatable access tests for (a) YouTube public data — organic side, (b) one ad-intelligence source for the intended market — results committed under `docs/marketing/evidence/` and rows signed in `MARKETING-DATA-SOURCES.md`.
+- **(a) Organic — VERIFIED 2026-10-28:** keyless YouTube public routes (uploads RSS + oEmbed + handle→channel-id resolution) implemented as a real connector (`connector:youtube-public`, research-only) and exercised live through the full connector contract: 15 organic records + 15 real view-count observations, idempotent ingest, honest coverage gaps, negative control. Evidence: `evidence/2026-10-28-w1-source-access-youtube-public.txt` (exit 0). Row signed in `MARKETING-DATA-SOURCES.md` ("YouTube public metadata — oEmbed + channel uploads RSS (keyless)"). The key-based Data API (per-video history) remains unverified — no credentials in this environment.
+- **(b) Ad-intelligence — BLOCKED (honest):** Meta Ad Library `ads_archive` probed live without credentials: endpoint reachable, documented parameters validated, no data without an access token (typed `auth_required`, recorded in the same evidence file Part 2). Repeatable harness committed (`demo/runSourceVerification.ts` reads `META_AD_LIBRARY_TOKEN`); a credentialed Worker A run + intended-market decision closes the item.
+- **Blocked by:** API credentials + intended market/geography definition (ad side only).
 
 ### W2-1 — Temporal data foundation (loop machinery)
-- **Owner:** Worker B (TL implemented the slice) · **Status:** ✅ Slice complete (2026-10-28); production persistence pending
-- **Deliverables:** `packages/marketing/src/app/temporalStore.ts` (idempotent ingest by source identity; superseded-value revision recording; as-of queries; velocity over comparable windows), coverage ledger recording.
-- **Evidence:** demo gates — double research run idempotent (no new entities), duplicate observations ignored (no metric inflation), as-of query reproduces only observations available at that time, velocity winner ≠ totals winner (`evidence/2026-10-28-w2-loop-demo-run.txt`).
-- **Remaining:** SQLite persistence adapter behind the same interface (repo storage conventions + migration rules), backfill where permitted.
+- **Owner:** Worker B (TL implemented the slice) · **Status:** ✅ Complete (2026-10-28) — in-memory + SQLite production persistence
+- **Deliverables:** `packages/marketing/src/app/temporalStore.ts` (`TemporalStorePort` + in-memory implementation: idempotent ingest by source identity, superseded-value revision recording, as-of queries, velocity over comparable windows, coverage ledger) and `packages/marketing/src/adapters/sqliteStore.ts` (`SqliteTemporalStore`: `node:sqlite`, repo-style immutable versioned migrations with checksummed append-only journal, append-only revision table preserving superseded values, close/reopen persistence). `MarketingMission` takes an injected store; workflows are storage-agnostic.
+- **Evidence:** in-memory gates — `evidence/2026-10-28-w2-loop-demo-run.txt`; SQLite conformance (same gates + persistence-across-reopen) — `evidence/2026-10-28-w2-sqlite-persistence-conformance.txt` (exit 0).
 
 ### W2-2 — Capability catalog + routing rules
 - **Owner:** TL · **Status:** ✅ Slice complete (2026-10-28)

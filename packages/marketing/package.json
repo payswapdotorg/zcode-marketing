@@ -8,7 +8,11 @@
   "scripts": {
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "demo:loop": "node --experimental-strip-types --no-warnings src/demo/runLoop.ts"
+    "typecheck": "tsc --build .",
+    "build": "tsc --build .",
+    "demo:loop": "tsc --build . && node dist/demo/runLoop.js",
+    "demo:sqlite": "tsc --build . && node dist/demo/runSqliteConformance.js",
+    "verify:sources": "tsc --build . && node dist/demo/runSourceVerification.js"
   },
   "dependencies": {
     "zod": "4.6.5"

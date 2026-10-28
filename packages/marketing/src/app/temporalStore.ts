@@ -6,9 +6,12 @@
  * and an as-of query reproduces the observations actually available at that
  * time. History is never silently rewritten.
  *
- * Layer: app. Storage is in-memory by design; a SQLite persistence adapter
- * (production wiring via the repo's storage conventions) plugs in behind the
- * same interface later — domain and workflows never know the difference.
+ * Layer: app. `TemporalStore` is the in-memory implementation; the SQLite
+ * persistence adapter (production wiring, `adapters/sqliteStore.ts`) implements
+ * the same `TemporalStorePort` — domain and workflows never know the
+ * difference. Superseded values are recorded as explicit revisions in the
+ * adapter's append-only revision table; the active series semantics below are
+ * identical across implementations.
  */
 import type {
   AdCreative,
@@ -26,7 +29,27 @@ export interface IngestResult {
   duplicatesIgnored: number;
 }
 
-export class TemporalStore {
+/**
+ * The port every temporal store implementation satisfies (in-memory and
+ * SQLite persistence alike). MarketingMission depends on this interface only.
+ */
+export interface TemporalStorePort {
+  ingestAds(ads: AdCreative[], now: string): IngestResult;
+  ingestOrganic(items: OrganicContent[], now: string): IngestResult;
+  ingestMetrics(observations: MetricObservation[], now: string): IngestResult;
+  recordCoverage(report: CoverageReport): void;
+  /** As-of query: only observations actually available at `at` are returned. */
+  metricsAsOf(metricKey: string, subjectRef: string, at: string): MetricObservation[];
+  latestObservation(metricKey: string, subjectRef: string, at: string): MetricObservation | undefined;
+  /** Velocity over a comparable window (like-for-like discipline). */
+  velocity(metricKey: string, subjectRef: string, at: string, windowDays: number): number | undefined;
+  allAds(): AdCreative[];
+  allOrganic(): OrganicContent[];
+  latestCoverage(): CoverageReport | undefined;
+  ingestAudit(): ReadonlyArray<{ at: string; key: string; outcome: 'new' | 'duplicate' | 'superseded' }>;
+}
+
+export class TemporalStore implements TemporalStorePort {
   private readonly ads = new Map<string, AdCreative>();
   private readonly organic = new Map<string, OrganicContent>();
   /** metricKey -> subjectRef -> ascending-by-observedAt observation list. */

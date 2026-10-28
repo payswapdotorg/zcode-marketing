@@ -51,4 +51,4 @@ Routing rule: **cheapest suitable capability that meets quality and reliability 
 
 ## Status of mapping (honest)
 
-W0 audit confirmed the existence and location of the runtime pieces above from source inspection. Runtime execution of a marketing tool end-to-end inside the CLI (W3) is not yet demonstrated; the current slice (W1/W2) proves the domain contracts, temporal semantics, and loop logic in `packages/marketing` with a sample connector, pending integration into the plugin/tool chain.
+W0 audit confirmed the existence and location of the runtime pieces above from source inspection, and the full-environment gates have since been run and recorded (`evidence/2026-10-28-full-env-verification.txt`). The domain slice (W1/W2) proves the domain contracts, temporal semantics (in-memory AND SQLite persistence), and loop logic in `packages/marketing` with a sample connector plus one verified real connector (`connector:youtube-public`, keyless public organic routes). Runtime execution of a marketing tool end-to-end inside the CLI (W3) is not yet demonstrated — plugin/tool-chain integration remains the W3 entry work order.

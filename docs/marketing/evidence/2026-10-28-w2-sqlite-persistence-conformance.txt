@@ -1,0 +1,124 @@
+SQLite temporal-store conformance run — W2-1 (production persistence)
+Date: 2026-10-28 (UTC)
+Environment: zcode-marketing fork sandbox — Node v24.22.1 (node:sqlite DatabaseSync), pnpm 10.33.2, Linux x64
+Run: pnpm --filter @zcode/marketing demo:sqlite  (exit code 0)
+Adapter under test: packages/marketing/src/adapters/sqliteStore.ts — SqliteTemporalStore implements TemporalStorePort
+Fixtures: labeled synthetic ground truth from src/adapters/fixtures.ts (same set as the in-memory W2 gate run)
+Migration discipline: immutable versioned migrations (checksum over trimmed SQL, append-only
+marketing_schema_migration journal, touchedTables declared before any SQL executes) mirroring
+packages/shared/src/sqlite-migrations conventions; self-contained because the marketing module
+is registered with requires: [] in architecture-policy.yaml.
+
+=======================================================================
+
+
+== First ingest ==
+{
+  "r1a": {
+    "acceptedEntities": 2,
+    "acceptedMetrics": 0,
+    "duplicatesIgnored": 0
+  },
+  "r1b": {
+    "acceptedEntities": 2,
+    "acceptedMetrics": 0,
+    "duplicatesIgnored": 0
+  },
+  "r1c": {
+    "acceptedEntities": 0,
+    "acceptedMetrics": 13,
+    "duplicatesIgnored": 0
+  }
+}
+
+== Second ingest (identical fixtures) ==
+{
+  "r2a": {
+    "acceptedEntities": 0,
+    "acceptedMetrics": 0,
+    "duplicatesIgnored": 2
+  },
+  "r2b": {
+    "acceptedEntities": 0,
+    "acceptedMetrics": 0,
+    "duplicatesIgnored": 2
+  },
+  "r2c": {
+    "acceptedEntities": 0,
+    "acceptedMetrics": 0,
+    "duplicatesIgnored": 13
+  }
+}
+  ✔ double ingest is idempotent (no new entities)
+  ✔ second ingest accepts nothing (no metric inflation)
+  ✔ duplicates recorded and ignored in the audit log
+
+== Supersede handling ==
+{
+  "revisions": [
+    {
+      "seq": 1,
+      "revisionKey": "sample-platform/yt-101#views@2026-06-30T14:40:04.695Z",
+      "oldValue": 46000,
+      "newValue": 45000,
+      "revisedAt": "2026-10-28T10:09:00.000Z"
+    }
+  ],
+  "activeLatest": {
+    "kind": "MetricObservation",
+    "id": "m-yt-101-views-2",
+    "missionId": "mission-fixture",
+    "subjectRef": "yt-101",
+    "metricKey": "views",
+    "value": 52000,
+    "observedAt": "2026-08-29T14:40:04.695Z",
+    "source": {
+      "sourceId": "sample-platform",
+      "sourceRecordId": "yt-101",
+      "connectorVersion": "0.1.0"
+    },
+    "metricDefinition": "platform-public-stat",
+    "metricDefinitionVersion": "v1"
+  }
+}
+  ✔ changed value at same observation key is recorded as an explicit revision (old value preserved)
+  ✔ active series still returns the true latest observation for the subject
+  ✔ revision is keyed by observation identity (source + metric + observedAt)
+
+== As-of query ==
+{
+  "boundary": "2026-06-30T14:40:04.695Z",
+  "count": 2,
+  "values": [
+    40000,
+    45000
+  ]
+}
+  ✔ as-of query returns only observations available at that time
+  ✔ as-of query returns the full pre-boundary series
+
+== Velocity (7-day comparable window) ==
+{
+  "yt101": 699.9999999324846,
+  "yt102": 15750
+}
+  ✔ velocity winner is yt-102 (momentum beats 6-month totals)
+  ✔ coverage reports recorded and latest retrievable
+
+== Reopened after close ==
+{
+  "ads": 2,
+  "organic": 2,
+  "audit": 36,
+  "revisions": 1
+}
+  ✔ ads survive close + reopen
+  ✔ organic content survives close + reopen
+  ✔ metric series survives close + reopen
+  ✔ revision history survives close + reopen
+  ✔ coverage reports survive close + reopen
+  ✔ append-only ingest audit survives close + reopen
+  ✔ re-read records re-validate against the zod contracts
+
+ALL SQLITE CONFORMANCE GATES PASSED — W2 temporal semantics hold under production persistence.
+Recorded as evidence under docs/marketing/evidence/ (see WORK-REGISTRY.md W2-1).

@@ -1,0 +1,69 @@
+Full-environment verification run — fork top blocker closure (W1/W0 integration item)
+Date: 2026-10-28 (UTC)
+Environment: zcode-marketing fork sandbox — Linux x64, 2 CPUs, 3.9 GB RAM, Node v24.22.1
+(engines: >=24.0.0 satisfied; apps/zcode-cli pins 24.14.0 — engine warning only, non-fatal),
+pnpm 10.33.2 via corepack (shim installed to a user-writable bin directory).
+Scope: bootstrapped the complete monorepo toolchain and ran the fork's regression gates
+     (FEATURE-PRESERVATION-MATRIX.md "Regression protocol", step 1) with truthful results.
+
+Results (all executed in this sandbox, commands as run from the repo root):
+
+  1. node scripts/check-workspace-freshness.mjs
+     → PASS: "baseline fresh: main (in sync with origin/main), relative to origin/main: ahead 0 / behind 0 (threshold 50)"
+
+  2. pnpm install --no-frozen-lockfile
+     → PASS: 54 workspace projects installed in 1m 24.7s; root prepare (husky +
+       pnpm build:cua → tsc --noEmit) succeeded; packages/desktop postinstall
+       (node-pty electron-rebuild) succeeded.
+     → NOTE: pnpm-lock.yaml was regenerated because the committed lockfile predated
+       packages/marketing (dependency zod@4.6.5 was not locked by the W0 baseline);
+       the updated lockfile is committed with this change.
+
+  3. pnpm typecheck (root, tsc -b over 18 project configs)
+     → PASS (exit 0) — including packages/marketing, newly wired into the root
+       typecheck chain by this change (it was missing from the W0 baseline chain).
+     → Environment limitation, recorded honestly: the first attempt crashed with
+       the default 2 GB V8 heap (JavaScript heap out of memory) because the
+       sandbox has 3.9 GB total RAM; it completed with
+       NODE_OPTIONS="--max-old-space-size=3000" and incremental tsc state
+       (re-run is a 7.4 s no-op, exit 0). Full history is not re-executed here.
+
+  4. pnpm lint (root oxlint)
+     → PASS: 0 errors, 97 warnings (pre-existing upstream warnings; the marketing
+       package contributes no new errors).
+
+  5. pnpm architecture:check --changed
+     → PASS: "architecture: OK / base: merge-base upstream origin/main / violations: 0 / baseline: 0 / new: 0"
+
+  6. pnpm test:architecture (architecture-governance suites)
+     → PASS: 36 pass, 0 fail (architecture-governance, -review, upstream-admission,
+       source-size-policy).
+
+  7. pnpm db:schema:check
+     → PASS: "SQLite schema compatible" for both baselines
+       (packages/services/src/project-storage/schema.baseline.sql,
+       apps/zcode-cli/packages/adapters/src/storage/session-store/schema.baseline.sql).
+
+  8. Marketing package gates:
+     - pnpm --filter @zcode/marketing typecheck   → PASS (exit 0)
+     - pnpm --filter @zcode/marketing demo:loop   → PASS: ALL GATES PASSED
+       (evidence/2026-10-28-w2-loop-demo-run.txt format; re-run after the
+       TemporalStorePort refactor — identical gates)
+     - pnpm --filter @zcode/marketing demo:sqlite → PASS: ALL SQLITE CONFORMANCE
+       GATES PASSED (evidence/2026-10-28-w2-sqlite-persistence-conformance.txt)
+     - pnpm --filter @zcode/marketing verify:sources → PASS (exit 0)
+       (evidence/2026-10-28-w1-source-access-youtube-public.txt)
+
+  9. Bug found and fixed during verification (recorded honestly):
+     - packages/marketing/src/index.ts exported ConnectorFailure twice (type +
+       value) → TS2300 duplicate identifier; fixed by keeping the value export.
+     - demo:loop script as committed ("node --experimental-strip-types src/...")
+       cannot run: Node does not remap .js import specifiers to .ts sources;
+       the script now compiles first (tsc --build .) and runs dist output.
+
+Not run in this environment (honest scope statement):
+  - pnpm verify:pre-push full chain (affected vitest selection) and full pnpm test
+    suites: not executed in this run; this evidence file records the gates above
+    only. Not reported as passed.
+  - Desktop E2E (Dockerfile.desktop-e2e, webdriverio) and web dev servers: not
+    executed in this sandbox (no display; memory constraints).
