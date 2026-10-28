@@ -1,0 +1,16 @@
+{
+  "name": "@zcode/marketing",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "demo:loop": "node --experimental-strip-types --no-warnings src/demo/runLoop.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  }
+}

@@ -37,6 +37,16 @@ modules:
     layers: {domain: domain, app: app, adapters: adapters}
     layerOrder: [domain, app, adapters]
     owner: desktop-settings
+  # marketing：本 fork 新增的营销领域层；治理唯一事实源在 docs/marketing/（MARKETING-ARCHITECTURE-LOCK.md）。
+  # 现有 runtime 是唯一执行引擎；marketing 只通过既有扩展点提供能力（禁止并行实现）。
+  - id: marketing
+    roots: [packages/marketing/src]
+    managed: true
+    requires: []
+    publicEntrypoints: [packages/marketing/src/index.ts]
+    layers: {domain: domain, app: app, adapters: adapters}
+    layerOrder: [domain, app, adapters]
+    owner: marketing-tl
   - id: client
     roots: [packages/client/src]
     managed: false

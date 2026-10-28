@@ -36,6 +36,15 @@ affected 使用 Vitest 官方选择，只运行选中的根 UT；选中整个套
 - `apps/zcode-cli`：Agent CLI 与运行时。
 - `CONTEXT.md`：插件商店领域词汇；修改相关 UI 前阅读。
 - `DESIGN.md`：UI 设计规范；修改 UI 前阅读。
+- `packages/marketing`：营销领域层（本 fork 新增）。修改前必读 `docs/marketing/MARKETING-ARCHITECTURE-LOCK.md` 与 `docs/marketing/MARKETING-NORTH-STAR.md`；该目录（docs/marketing/）是营销产品目标、架构边界、数据源台账、连接器契约、评测与路线图的唯一事实源。
+
+## 营销领域（本 fork 的产品方向）
+
+- 现有 runtime 是唯一执行引擎：营销能力只通过既有 tool/plugin/skill/provider 扩展点接入，禁止第二套 planner loop、会话引擎或 subagent 框架（见 `docs/marketing/MARKETING-ARCHITECTURE-LOCK.md`）。
+- 数据访问是第一等能力：每次研究运行必须产出诚实的 CoverageReport（available/partial/unavailable/not_connected/restricted），禁止用估算静默填补缺口；禁止绕过平台认证、限流与访问控制。
+- 时间语义必须区分 observed_at / published_at / ingested_at；摄取幂等，历史只追加不重写，as-of 查询不得混入当前值（见 `docs/marketing/MARKETING-DATA-MODEL.md`）。
+- 有机发布与付费广告是独立权限域；发布必须显式审批、幂等键防重、凭据不得进入 prompt/日志/产物（见 `docs/marketing/PLATFORM-CONNECTOR-CONTRACT.md`）。
+- 工作订单、所有权与验收证据登记在 `docs/marketing/WORK-REGISTRY.md`；任何任务不得仅凭“报告完成”视为完成。
 
 ## 实现与验证
 

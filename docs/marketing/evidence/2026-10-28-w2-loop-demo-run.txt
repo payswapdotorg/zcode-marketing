@@ -1,0 +1,249 @@
+
+== Stage A — competitor candidates (user-correctable) ==
+[
+  {
+    "name": "RivalOne",
+    "relevance": "overlapping product category and audience with the described offer",
+    "confidence": 0.8
+  },
+  {
+    "name": "RivalTwo",
+    "relevance": "overlapping product category and audience with the described offer",
+    "confidence": 0.8
+  }
+]
+
+== Coverage report (run 1) ==
+{
+  "kind": "CoverageReport",
+  "id": "coverage-3",
+  "missionId": "mission-demo-1",
+  "generatedAt": "2026-10-28T10:07:00.000Z",
+  "slices": [
+    {
+      "slice": "organic-content:youtube",
+      "state": "available",
+      "sourceId": "sample-platform",
+      "connectorVersion": "0.1.0",
+      "region": "fixture",
+      "dateWindow": "fixtures",
+      "note": "publicly accessible posts, observable engagement and timestamps"
+    },
+    {
+      "slice": "competitor-ad-library:meta",
+      "state": "restricted",
+      "sourceId": "sample-adlib",
+      "connectorVersion": "0.1.0",
+      "region": "fixture",
+      "dateWindow": "fixtures",
+      "note": "coverage restricted by source, country, date and advertiser access"
+    },
+    {
+      "slice": "private-conversion-performance",
+      "state": "not_connected",
+      "sourceId": "sample-adlib",
+      "connectorVersion": "0.1.0",
+      "note": "requires advertiser account access, measurement integrations or supplied reports"
+    }
+  ],
+  "supportsConclusion": "Available evidence supports a preliminary creative hypothesis; it does not support a definitive ranking of competitors by sales or ROAS."
+}
+  ✔ coverage gaps are explicit (restricted/not_connected states present)
+  ✔ every coverage slice carries source identity and connector version
+  ✔ double research run is idempotent (no new entities)
+  ✔ duplicate observations recorded and ignored (no metric inflation)
+
+== Stage B — extracted creative structure ==
+{
+  "adHooks": [
+    "price-first urgency opening",
+    "price-first urgency opening"
+  ],
+  "organicHooks": [
+    "creator-led demonstration",
+    "creator-led personal benefit reveal"
+  ],
+  "extractionModels": [
+    "heuristic:multimodal"
+  ]
+}
+  ✔ every feature set carries extraction provenance
+
+== Stage C — like-for-like performance signals ==
+[
+  {
+    "subjectRef": "yt-101",
+    "total": 52000,
+    "velocity": 700,
+    "note": "[PROXY] views (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on views"
+  },
+  {
+    "subjectRef": "yt-102",
+    "total": 21000,
+    "velocity": 15750,
+    "note": "[PROXY] views (objective metric 'attributedConversions' not observable for competitors) — velocity over comparable 7-day window on views"
+  }
+]
+  ✔ velocity winner is yt-102 (12-day-old video beats 6-month totals)
+  ✔ raw totals would have chosen differently — velocity, not totals, drives ranking
+  ✔ as-of query returns only observations available at that time
+
+== Stage D — evidence-backed opportunity (scores separated) ==
+[
+  {
+    "pattern": {
+      "problem": "audience does not believe the benefit claim without proof",
+      "message": "show the product delivering the promised benefit in the first 3 seconds",
+      "hook": "creator-led personal benefit reveal",
+      "format": "9:16 creator demo, 30s",
+      "demonstration": "side-by-side before/after within creator context",
+      "cta": "single low-friction CTA aligned with objective"
+    },
+    "observed": "5975.9",
+    "crossSourceSupport": 1,
+    "predicted": 14000,
+    "confidence": 0.6,
+    "evidence": [
+      "ad-rivalone-v0",
+      "yt-102",
+      "yt-101"
+    ],
+    "contrary": [],
+    "explanation": "supported by 1 paid + 2 organic independent refs; 0 contrary; confidence reflects evidence completeness, not model certainty"
+  }
+]
+  ✔ top opportunity is supported by BOTH paid and organic independent evidence
+  ✔ observed / cross-source / predicted / confidence are separate, honest numbers
+
+== Creative brief (intent + blueprint + prompt pack + experiment spec) ==
+{
+  "intent": {
+    "objective": "sales",
+    "audience": "commuting coffee drinkers, 25-40",
+    "angle": "show the product delivering the promised benefit in the first 3 seconds",
+    "why": "evidence-backed paid×organic intersection (see hypothesis)"
+  },
+  "blueprint": {
+    "hook": "creator-led personal benefit reveal",
+    "storyboard": [
+      {
+        "storyboard": [
+          "creator-led opening with benefit reveal",
+          "in-use demonstration",
+          "proof moment",
+          "single CTA"
+        ]
+      },
+      [
+        "creator-led opening with benefit reveal",
+        "in-use demonstration",
+        "proof moment",
+        "single CTA"
+      ]
+    ],
+    "cta": "single low-friction CTA aligned with objective",
+    "pacing": "fast-open, proof-middle, single cta close"
+  },
+  "generatorPromptPack": {
+    "durationSec": 30,
+    "aspectRatio": "9:16",
+    "prompt": "Hook: creator-led personal benefit reveal; Demonstration: side-by-side before/after within creator context; CTA: single low-friction CTA aligned with objective",
+    "negativeConstraints": [
+      "no unsubstantiated claims",
+      "no competitor trademarks"
+    ]
+  },
+  "experimentSpec": {
+    "hypothesisId": "hypothesis-9",
+    "predictedOutcome": {
+      "objective": "sales",
+      "low": 8000,
+      "expected": 14000,
+      "high": 22000,
+      "metricKey": "attributedConversions"
+    },
+    "changedVariables": [
+      "hook"
+    ],
+    "metric": "attributedConversions",
+    "windowDays": 14
+  },
+  "draftedBy": "heuristic:reasoner"
+}
+  ✔ publish refuses unapproved artifacts (explicit approval required)
+  ✔ publication is idempotent-keyed (retries cannot duplicate posts)
+  ✔ assisted handoff when connector has no publishing capability (capability-declared)
+  ✔ organic publishing never authorizes paid campaigns (separate permission domains)
+
+== Measured outcome vs preserved forecast ==
+{
+  "forecast": {
+    "objective": "sales",
+    "low": 8000,
+    "expected": 14000,
+    "high": 22000,
+    "metricKey": "attributedConversions"
+  },
+  "observed": 180,
+  "experiment": {
+    "kind": "ExperimentRecord",
+    "id": "experiment-12",
+    "missionId": "mission-demo-1",
+    "hypothesisId": "hypothesis-9",
+    "artifactId": "artifact-10",
+    "publicationId": "publication-11",
+    "goalMetricKey": "attributedConversions",
+    "changedVariables": [
+      "hook"
+    ],
+    "measurementWindowDays": 14,
+    "startedAt": "2026-10-28T10:23:00.000Z",
+    "result": {
+      "forecastPreserved": true,
+      "observedMetricKey": "attributedConversions",
+      "observedValue": 180,
+      "supported": [
+        "format held attention across window"
+      ],
+      "contradicted": [],
+      "completedAt": "2026-10-28T10:27:00.000Z"
+    }
+  },
+  "calibration": [
+    {
+      "evaluatedAt": "2026-10-28T10:28:00.000Z",
+      "forecastError": 179,
+      "note": "initial calibration entry"
+    }
+  ],
+  "nextAction": {
+    "kind": "NextAction",
+    "id": "next-action-15",
+    "missionId": "mission-demo-1",
+    "experimentId": "experiment-12",
+    "keep": [
+      "format held attention across window"
+    ],
+    "change": [
+      "hook: no assumption contradicted — next experiment changes the opening hook variant"
+    ],
+    "recommendation": "keep the winning elements; test a new hook against the same audience next iteration",
+    "evidence": [
+      {
+        "ref": "experiment:experiment-12",
+        "accessMethod": "officialApi",
+        "observedAt": "2026-10-28T10:29:00.000Z",
+        "supports": "recorded outcome vs preserved forecast"
+      }
+    ]
+  }
+}
+  ✔ original forecast preserved verbatim next to the observed outcome
+  ✔ next-experiment recommendation references recorded evidence
+  ✔ calibration history is appended, never overwritten
+
+== Coverage conclusion (final) ==
+"Available evidence supports a preliminary creative hypothesis; it does not support a definitive ranking of competitors by sales or ROAS."
+
+ALL GATES PASSED — full learning loop completed on the sample connector.
+Next: W3 runtime integration (marketing tools in the CLI plugin chain) — see docs/marketing/MARKETING-ROADMAP.md
