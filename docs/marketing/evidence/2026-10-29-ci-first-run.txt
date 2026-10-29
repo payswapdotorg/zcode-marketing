@@ -68,3 +68,30 @@ FOLLOW-UP: the second CI run on the fixed workflow is the acceptance record for 
 evidence file; its per-job results are recorded in the WORK-REGISTRY change log
 (with the run id). If any job is still red, the failure and its handling is recorded
 there the same way — no failure is silently dropped.
+
+RUN 2 (8aad8e03, GitHub Actions run 40910954498) — root causes of the two remaining reds:
+
+  governance ✅ | typecheck ✅ | desktop-e2e ✅ (FIRST FULLY GREEN desktop-electron run
+  outside a dev machine: container image + electron + 4/4 replay-admitted specs green,
+  with the E2E_SPEC preset pinning upstream-provider out of the credentials-free gate)
+
+  unit ❌ at exactly 4 of 2054 test files — both root causes diagnosed from upstream code:
+    (a) packages/desktop/test/e2eReporting{ErrorClassification,Lifecycle,SummarySkipped}
+        .test.ts — "Failed to resolve entry for package @zcode/e2e-report": the root unit
+        suite imports this package BY NAME and its package.json exports point at
+        dist-node (a build product). The runner was fresh (the recorded W7-1 green run
+        happened on a box whose dists had been built by pnpm bootstrap during the waves).
+        Fix: `pnpm --filter @zcode/e2e-report build` before the suite (validated locally:
+        build exit 0, and the 3 files pass).
+    (b) packages/desktop/test/browserDataManager.test.ts "先复制 LocalStorage 快照..." —
+        the test passes platform:"aix" and expects NO chrome executable to resolve
+        (originsFailed:1 / chrome_executable_not_found); the resolver honors ambient
+        CHROME_PATH/CHROME_EXECUTABLE (chromeExecutableDiscovery.ts), and GitHub's
+        ubuntu-24.04 runner image SHIPS Chrome with CHROME_PATH exported globally —
+        flipping the assertion to originsFailed:0. An upstream test/runner-env assumption
+        leak, not a code defect. Fix: run the suite with `env -u CHROME_PATH
+        -u CHROME_EXECUTABLE` (validated locally: the 4 previously failing files pass
+        32/32 together once the e2e-report dist exists and CHROME_PATH is absent).
+
+  The third run (this fix commit) is the acceptance record for this evidence file;
+  per-job results are recorded in the WORK-REGISTRY change log with the run id.

@@ -111,7 +111,21 @@ jobs:
       - name: Build CLI workspace (turbo)
         working-directory: apps/zcode-cli
         run: node ../../node_modules/.bin/turbo run build --concurrency=2
-      - run: pnpm run test:unit
+      # The root unit suite imports @zcode/e2e-report BY PACKAGE NAME (its exports point
+      # at dist-node), so its build product must exist before the suite runs — it is the
+      # only dist-dependent root-suite import (validated: 2050/2054 files passed without
+      # it; the 3 failures were exactly the e2eReporting tests importing this package).
+      - name: Build the e2e-report package (root-suite dist dependency)
+        run: pnpm --filter @zcode/e2e-report build
+      # GitHub's ubuntu-24.04 runner image SHIPS Chrome and exports CHROME_PATH globally.
+      # browserDataManager's aix-platform test asserts that no Chrome executable can be
+      # resolved, and the resolver honors ambient CHROME_PATH/CHROME_EXECUTABLE — so the
+      # runner's leaked env flips that assertion. Unset both for the suite (matches the
+      # environment where the recorded W7-1 green run was produced; validated locally:
+      # the failing file passes 32/32 together with the e2eReporting files once the
+      # e2e-report dist exists and CHROME_PATH is absent).
+      - name: Root unit suite (complete, runner-env cleaned)
+        run: env -u CHROME_PATH -u CHROME_EXECUTABLE pnpm run test:unit
         env:
           NODE_OPTIONS: --max-old-space-size=4096
       # The three recorded plugin-chain gates from the W7-1 full-environment regression:
