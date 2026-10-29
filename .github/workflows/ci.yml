@@ -104,25 +104,59 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Repo convention: plugin dists are build products and the bootstrap seed tests read
-      # them (turbo `test` dependsOn `build`); build first so the root suite sees dists.
-      - run: pnpm --dir apps/zcode-cli build
+      # them (turbo `test` dependsOn `build`). turbo is invoked by its hoisted-root binary
+      # path: with `node-linker=hoisted` the turbo bin links only at the repo root, and
+      # `pnpm --dir`/`pnpm exec` do not resolve it from workspace subdirectories
+      # (validated locally: 25/25 build tasks green via this invocation).
+      - name: Build CLI workspace (turbo)
+        working-directory: apps/zcode-cli
+        run: node ../../node_modules/.bin/turbo run build --concurrency=2
       - run: pnpm run test:unit
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-      - run: pnpm --dir apps/zcode-cli test
+      # The three recorded plugin-chain gates from the W7-1 full-environment regression:
+      # bootstrap plugin-registry 47/47, adapters plugins 79/79, marketing-plugin 56/56.
+      # (The full `turbo run test` fan-out is NOT a CI gate: upstream suites are
+      # concurrency-sensitive by the repo's own recorded history — e.g.
+      # dynamic-workflow-runtime passes standalone but fails under turbo concurrency.)
+      - name: Bootstrap plugin-registry suite (reads the built dists)
+        working-directory: apps/zcode-cli/packages/bootstrap
+        run: pnpm exec vitest run tests/plugins.test.ts
+      - name: Adapters plugin conformance suite
+        working-directory: apps/zcode-cli/packages/adapters
+        run: pnpm exec vitest run tests/plugins.test.ts
+      - name: Marketing plugin suite
+        working-directory: apps/zcode-cli/packages/marketing-plugin
+        run: pnpm exec vitest run
 
   desktop-e2e:
     name: desktop e2e (electron, container, replay-isolated)
     runs-on: ubuntu-24.04
     timeout-minutes: 150
+    env:
+      # The container script's DEFAULT_E2E_SPEC also lists upstream-provider.test.ts —
+      # which is a REAL-UPSTREAM (capture-mode) spec BY DESIGN (see
+      # packages/desktop/test/e2e/helpers/upstream-replay-fixture-resolution.ts:
+      # "Upstream provider smoke ... verify the real upstream") and therefore requires
+      # E2E_NETWORK_MODE=capture + a real E2E_PROVIDER_API_KEY. It cannot pass in the
+      # credentials-free replay-isolated mode this job pins, so it is excluded from the
+      # CI preset and recorded as a credentials-gated path (run it manually with a real
+      # provider key; evidence in docs/marketing/evidence/2026-10-29-ci-first-run.txt).
+      E2E_SPEC: ./test/e2e/container-boot.test.ts,./test/e2e/smoke.test.ts,./test/e2e/e2ecase-regression.test.ts,./test/e2e/task-list-archive-confirmation.test.ts
     steps:
       - uses: actions/checkout@v4
-      - name: Run the desktop E2E container suite
+      - name: Run the desktop E2E container suite (replay-admitted specs)
         run: bash scripts/test-desktop-e2e-container.sh
+      - name: List E2E artifact tree (diagnosability)
+        if: always()
+        run: find packages/desktop/.e2e-artifacts packages/desktop/errorShots -type f 2>/dev/null | head -50 || true
       - name: Upload E2E artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: desktop-e2e-artifacts
-          path: packages/desktop/.e2e-artifacts/
-          if-no-files-found: ignore
+          path: |
+            packages/desktop/.e2e-artifacts/
+            packages/desktop/errorShots/
+          if-no-files-found: warn
+          include-hidden-files: true

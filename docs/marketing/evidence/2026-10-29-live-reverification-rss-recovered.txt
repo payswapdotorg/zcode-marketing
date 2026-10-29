@@ -1,0 +1,72 @@
+Live re-verification — 2026-10-29 (later the same day): the keyless uploads-RSS
+route-availability incident is RECOVERED, and both verified live sources re-run green
+==================================================================================================
+
+Session context: post-roadmap-completion session. The recorded follow-up in
+MARKETING-DATA-SOURCES.md / MARKETING-ROADMAP.md said: "route availability to be
+re-confirmed at the next live organic use" after the platform-side partial outage
+(uploads RSS returned HTTP 404 for many channels during the 2026-10-29 W1-3(b) run).
+
+RUN A — organic side re-verification (closes the follow-up)
+- Command: pnpm --filter @zcode/marketing verify:sources   (exit 0)
+- Gates: 11/11 pass (transcript in this file's RUN A section below).
+- Result: uploads RSS slice for the verification subject UCuAXFkgsw1L7xaCfnd5JJOw is
+  "available" again — 15 real organic records + 15 real view-count observations ingested
+  idempotently (fresh fetch = source-identity idempotent; identical observations re-ingest
+  = no-op; fresh snapshots at a later time = the velocity mechanism, never inflation).
+- Honest controls unchanged: unresolvable channel hint still produces an explicit
+  unavailable coverage gap (never invented data); keyless history limitation still reported
+  explicitly (current-snapshot counts only); Meta Ad Library probe still documents
+  auth_required (not a fake pass).
+
+RUN B — direct route probes (the incident's affected channel + the verification subject)
+- https://www.youtube.com/feeds/videos.xml?channel_id=UC-y91EU3KtDG_yZuSxeMI6w
+  (Wacaco — the channel recorded as 404 during the outage):
+      HTTP 200, 15 <entry> items, first upload title:
+      "Prestina by Wacaco | A New Way to Press Coffee"
+- https://www.youtube.com/feeds/videos.xml?channel_id=UCuAXFkgsw1L7xaCfnd5JJOw
+  (the W1-3(a) verification subject):
+      HTTP 200, 15 <entry> items, first upload title:
+      "Hits for decades ... The Best of Me (and the Never Edition!) ..."
+- Conclusion: the platform-side partial outage has RECOVERED for both the channel that
+  failed during the incident and the standing verification subject. The connector's
+  honest-gap behavior during the outage is the durable lesson and stays as designed.
+
+RUN C — ad side fresh verification (same session, recorded for a current data point)
+- Command: pnpm --filter @zcode/marketing verify:adsource   (exit 0)
+- Gates: 21/21 pass.
+- Result: real brand "Wacaco" resolved to the real advertiser "Wacaco Company Limited"
+  (AR14412319853346029569, HK); service reported 96 total ads; 182 real creatives ingested
+  idempotently over 3 bounded pages (first fetch = all new entities; fresh fetch = no new
+  entities; identical page re-ingest = no-op). Provenance on every record; platform-
+  reported first/last-shown dates kept strictly distinct from observation timestamps;
+  no-impressions/spend and no-surface-split limitations reported explicitly; negative
+  control zz-no-such-advertiser-q7x9 = honest coverage gap. The paid x organic
+  intersection produced evidence-backed opportunities from real data only, referencing
+  real paid (atc:CR00139519143572406273, atc:CR00334389059696721921) and real organic
+  (yt:-adZkEIXQnc, yt:CF9dlrU1Jo8) evidence, with the extraction backend labeled
+  (deterministic HeuristicModel; the model-routed path is the W3-2 bridge).
+
+Environment: zcode-marketing sandbox — Node v24.22.1, pnpm 10.33.2 (corepack, repo pin),
+Linux x64. NOTE: this session's sandbox had been restored from a snapshot and re-provisioned
+(node_modules reinstalled) before these runs — recorded in
+evidence/2026-10-29-env-restore-incident-recovery.txt. The verify scripts build
+packages/marketing from source (tsc --build) before executing.
+
+RUN A gates (verbatim ✔ list from the run):
+  ✔ oEmbed endpoint reachable and returns creative metadata without credentials
+  ✔ uploads RSS returned real organic content records
+  ✔ current-snapshot public view counts parsed as real metric observations
+  ✔ every record carries provenance (source identity + connector version)
+  ✔ observation time is distinguished from content publication time (temporal discipline)
+  ✔ unresolvable hint produces an honest coverage gap (no invented data)
+  ✔ keyless history limitation is reported explicitly (current-snapshot counts only)
+  ✔ a fresh fetch of the same sources accepts no new entities (source-identity idempotency on live data)
+  ✔ note: fresh fetch at a later time yields 15 new dated snapshots of the same subjects —
+    this is the repeated-observation (velocity) mechanism, not inflation
+  ✔ re-ingesting the identical observations is a no-op (no metric inflation)
+  ✔ probe documents the credential dependency honestly (auth_required, not a fake pass)
+
+Ledger effect: the "re-confirm at next live organic use" follow-up is CLOSED with a
+positive result; MARKETING-DATA-SOURCES.md and the MARKETING-ROADMAP.md blocker row are
+updated in the same commit as this file.
