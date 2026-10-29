@@ -171,10 +171,19 @@ async function main(): Promise<void> {
     }),
   ], now());
   const observed = mission.store.latestObservation('attributedConversions', 'post:ours', now())?.value ?? 0;
-  const { result, simulation, action } = await mission.completeExperiment(experiment, observed);
+  const { result, simulation, action, comparison } = await mission.completeExperiment(experiment, observed, {
+    observedMetricKey: 'attributedConversions',
+    forecast: {
+      low: top.hypothesis.predictedOutcome.low,
+      expected: top.hypothesis.predictedOutcome.expected,
+      high: top.hypothesis.predictedOutcome.high,
+      metricKey: top.hypothesis.predictedOutcome.metricKey,
+    },
+  });
   log('Measured outcome vs preserved forecast', {
     forecast: top.hypothesis.predictedOutcome,
     observed,
+    comparison,
     experiment: result,
     calibration: simulation.calibrationHistory,
     nextAction: action,
@@ -184,17 +193,25 @@ async function main(): Promise<void> {
     'original forecast preserved verbatim next to the observed outcome',
   );
   assert(
+    comparison.observedMetricKey === 'attributedConversions' && comparison.isProxy === false,
+    'comparison runs on the goal metric when it is observable (proxy labeling reserved for proxy cases)',
+  );
+  assert(
+    typeof comparison.withinForecastRange === 'boolean',
+    'within-range verdict computed against the preserved forecast bounds',
+  );
+  assert(
     action.evidence.length > 0 && action.evidence[0]!.ref === `experiment:${experiment.id}`,
     'next-experiment recommendation references recorded evidence',
   );
   assert(
-    simulation.calibrationHistory.length === 1,
-    'calibration history is appended, never overwritten',
+    simulation.calibrationHistory.length === 1 && simulation.calibrationHistory[0]!.note.includes('multiplicative correction'),
+    'calibration history is appended, never overwritten (correction recorded)',
   );
 
   log('Coverage conclusion (final)', mission.store.latestCoverage()?.supportsConclusion);
   console.log('\nALL GATES PASSED — full learning loop completed on the sample connector.');
-  console.log('Next: W3 runtime integration (marketing tools in the CLI plugin chain) — see docs/marketing/MARKETING-ROADMAP.md');
+  console.log('Next: W7 production hardening (reliability, quotas, recovery, integration expansion) — see docs/marketing/MARKETING-ROADMAP.md');
 }
 
 main().catch((err) => {

@@ -25,13 +25,14 @@ import {
   applyDocumentTheme,
   applyHostStyleVariables,
 } from "@modelcontextprotocol/ext-apps";
-import { en, zh, type CreativeState, type Evidence, type MissionEntry, type Report } from "./types.ts";
+import { en, zh, type ConnectionView, type CreativeState, type Evidence, type LoopState, type MissionEntry, type Report } from "./types.ts";
 import { S, esc, setHtml } from "./state.ts";
 import { render, setActions } from "./render.ts";
 import { setCreativeActions } from "./creative.ts";
+import { setLoopActions } from "./loop.ts";
 
 const SERVER_NAME = "marketing";
-const PLUGIN_VERSION = "0.3.0";
+const PLUGIN_VERSION = "0.4.0";
 
 // ---------------------------------------------------------------------------
 // Host connection — one App per page, connected before first render.
@@ -113,7 +114,7 @@ async function refreshAll(): Promise<void> {
     }
     rememberSelection();
     if (S.selectedId) {
-      await Promise.all([loadReport(S.selectedId), loadEvidence(S.selectedId), loadCreative(S.selectedId)]);
+      await Promise.all([loadReport(S.selectedId), loadEvidence(S.selectedId), loadCreative(S.selectedId), loadLoop()]);
     }
   } catch (error) {
     S.notice = failureNotice(error);
@@ -145,6 +146,23 @@ async function loadCreative(missionId: string): Promise<void> {
     S.creative = await callTool<CreativeState>("marketing_list_artifacts", { missionId });
   } catch {
     S.creative = null;
+  }
+}
+
+async function loadLoop(): Promise<void> {
+  try {
+    S.connections = await callTool<{ connections: ConnectionView[] }>("marketing_list_connections").then((r) => r.connections);
+  } catch {
+    S.connections = [];
+  }
+  if (!S.selectedId) {
+    S.loop = null;
+    return;
+  }
+  try {
+    S.loop = await callTool<LoopState>("marketing_list_publications", { missionId: S.selectedId });
+  } catch {
+    S.loop = null;
   }
 }
 
@@ -237,7 +255,7 @@ function selectMission(missionId: string): void {
   void refreshAll();
 }
 
-function selectTab(tab: "report" | "evidence" | "creative"): void {
+function selectTab(tab: "report" | "evidence" | "creative" | "loop"): void {
   S.tab = tab;
   render();
 }
@@ -340,6 +358,205 @@ async function recordProducedAsset(form: HTMLFormElement): Promise<void> {
 
 setActions({ refreshAll, startNewMissionFlow, submitStart, submitDiscover, runResearch, selectMission, selectTab });
 setCreativeActions({ draftForHypothesis, reviewArtifact, recordProducedAsset });
+
+// ---------------------------------------------------------------------------
+// W5/W6 loop actions (wired by ui/loop.ts) — every action calls the SAME
+// marketing tools the agent uses and refreshes through the same pipeline.
+// ---------------------------------------------------------------------------
+async function connectAccount(form: HTMLFormElement): Promise<void> {
+  const data = new FormData(form);
+  S.connectBusy = true;
+  render();
+  try {
+    await callTool("marketing_connect_publish_account", {
+      platform: String(data.get("platform") ?? "youtube"),
+      label: String(data.get("label") ?? ""),
+      accessToken: String(data.get("accessToken") ?? ""),
+      dataBase: String(data.get("dataBase") ?? "https://www.googleapis.com"),
+      accountRef: String(data.get("accountRef") ?? ""),
+      environment: String(data.get("environment") ?? "sandbox"),
+      connectedBy: S.locale === "zh" ? "面板用户" : "panel user",
+    });
+    S.connectBusy = false;
+    S.notice = null;
+    await refreshAll();
+  } catch (error) {
+    S.connectBusy = false;
+    S.notice = failureNotice(error);
+    render();
+  }
+}
+
+async function publishAsset(artifactId: string): Promise<void> {
+  if (!S.selectedId) return;
+  S.publishBusy = artifactId;
+  render();
+  try {
+    await callTool("marketing_publish_asset", {
+      missionId: S.selectedId,
+      artifactId,
+      approvedBy: S.locale === "zh" ? "面板用户" : "panel user",
+    });
+    S.publishBusy = "";
+    S.notice = null;
+    await refreshAll();
+  } catch (error) {
+    S.publishBusy = "";
+    S.notice = failureNotice(error);
+    render();
+  }
+}
+
+async function assistedHandoff(artifactId: string): Promise<void> {
+  if (!S.selectedId) return;
+  S.publishBusy = artifactId;
+  render();
+  try {
+    const result = await callTool<{ package: { title: string; description: string; tags: string[]; file?: { name: string; bytes: number; path: string }; steps: string[] } }>(
+      "marketing_assisted_handoff",
+      { missionId: S.selectedId, artifactId },
+    );
+    S.publishBusy = "";
+    const pkg = result.package;
+    const lines = [
+      `<b>${esc(pkg.title)}</b>`,
+      ...pkg.tags.map((t) => `#${esc(t)}`),
+      "",
+      pkg.file ? `${esc(pkg.file.name)} (${pkg.file.bytes} B) → ${esc(pkg.file.path)}` : "",
+      "",
+      ...pkg.steps.map((s, i) => `${i + 1}. ${esc(s)}`),
+    ].filter(Boolean);
+    S.notice = { kind: "info", html: `<b>${esc(S.locale === "zh" ? "辅助发布包" : "Assisted publishing package")}:</b><br/>${lines.join("<br/>")}` };
+    render();
+  } catch (error) {
+    S.publishBusy = "";
+    S.notice = failureNotice(error);
+    render();
+  }
+}
+
+async function recordManualPublication(form: HTMLFormElement): Promise<void> {
+  if (!S.selectedId) return;
+  const data = new FormData(form);
+  S.publishBusy = String(data.get("artifactId") ?? "");
+  render();
+  try {
+    await callTool("marketing_record_manual_publication", {
+      missionId: S.selectedId,
+      artifactId: String(data.get("artifactId") ?? ""),
+      url: String(data.get("url") ?? ""),
+      publishedBy: S.locale === "zh" ? "面板用户" : "panel user",
+    });
+    S.publishBusy = "";
+    S.notice = null;
+    await refreshAll();
+  } catch (error) {
+    S.publishBusy = "";
+    S.notice = failureNotice(error);
+    render();
+  }
+}
+
+async function verifyPublication(publicationId: string): Promise<void> {
+  if (!S.selectedId) return;
+  S.measureBusy = publicationId;
+  render();
+  try {
+    await callTool("marketing_verify_publication", { missionId: S.selectedId, publicationId });
+    S.measureBusy = "";
+    S.notice = null;
+    await refreshAll();
+  } catch (error) {
+    S.measureBusy = "";
+    S.notice = failureNotice(error);
+    render();
+  }
+}
+
+async function openExperiment(publicationId: string): Promise<void> {
+  if (!S.selectedId) return;
+  S.measureBusy = publicationId;
+  render();
+  try {
+    await callTool("marketing_open_experiment", { missionId: S.selectedId, publicationId });
+    S.measureBusy = "";
+    S.notice = null;
+    await refreshAll();
+  } catch (error) {
+    S.measureBusy = "";
+    S.notice = failureNotice(error);
+    render();
+  }
+}
+
+async function collectAnalytics(publicationId: string): Promise<void> {
+  if (!S.selectedId) return;
+  S.measureBusy = publicationId;
+  render();
+  try {
+    const result = await callTool<{ latest: Array<{ metricKey: string; value: number }> }>(
+      "marketing_collect_analytics",
+      { missionId: S.selectedId, publicationId, metrics: ["views"] },
+    );
+    S.measureBusy = "";
+    S.notice = {
+      kind: "info",
+      html: `<b>${esc(S.locale === "zh" ? "已采集许可分析" : "Permitted analytics collected")}:</b> ${result.latest
+        .map((l) => `${esc(l.metricKey)} = ${l.value}`)
+        .join(" · ")}`,
+    };
+    await refreshAll();
+  } catch (error) {
+    S.measureBusy = "";
+    S.notice = failureNotice(error);
+    render();
+  }
+}
+
+async function recordOutcome(form: HTMLFormElement): Promise<void> {
+  if (!S.selectedId) return;
+  const data = new FormData(form);
+  const experimentId = String(data.get("experimentId") ?? form.dataset.experiment ?? "");
+  const observedMetricKey = String(data.get("observedMetricKey") ?? "");
+  const proxyLow = String(data.get("proxyLow") ?? "");
+  const proxyExpected = String(data.get("proxyExpected") ?? "");
+  const proxyHigh = String(data.get("proxyHigh") ?? "");
+  const hasProxyBaseline = proxyLow !== "" && proxyExpected !== "" && proxyHigh !== "";
+  const goalMetricKey = S.loop?.experiments.find((e) => e.id === experimentId)?.goalMetricKey ?? "";
+  const isProxy = observedMetricKey !== "" && observedMetricKey !== goalMetricKey;
+  S.outcomeBusy = experimentId;
+  render();
+  try {
+    await callTool("marketing_record_outcome", {
+      missionId: S.selectedId,
+      experimentId,
+      observedValue: Number(data.get("observedValue")),
+      ...(isProxy ? { observedMetricKey } : {}),
+      ...(isProxy && hasProxyBaseline
+        ? { proxyForecast: { low: Number(proxyLow), expected: Number(proxyExpected), high: Number(proxyHigh) } }
+        : {}),
+      ...(String(data.get("sourceNote") ?? "") ? { sourceNote: String(data.get("sourceNote")) } : {}),
+    });
+    S.outcomeBusy = "";
+    S.notice = null;
+    await refreshAll();
+  } catch (error) {
+    S.outcomeBusy = "";
+    S.notice = failureNotice(error);
+    render();
+  }
+}
+
+setLoopActions({
+  connectAccount,
+  publishAsset,
+  assistedHandoff,
+  recordManualPublication,
+  verifyPublication,
+  openExperiment,
+  collectAnalytics,
+  recordOutcome,
+});
 
 // ---------------------------------------------------------------------------
 // Boot — connect, adopt the host theme + locale, first paint, then follow the

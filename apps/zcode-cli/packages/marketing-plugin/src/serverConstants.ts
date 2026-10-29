@@ -3,7 +3,7 @@
  * ui:// surface descriptor (office-panel convention).
  */
 export const PLUGIN_NAME = 'marketing';
-export const PLUGIN_VERSION = '0.3.0';
+export const PLUGIN_VERSION = '0.4.0';
 export const SERVER_NAME = 'marketing';
 
 /** W3-4: the workspace panel served as a ui:// resource (office-panel pattern). */

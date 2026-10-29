@@ -138,6 +138,79 @@ export interface Report {
   opportunities: Opportunity[];
 }
 
+/** W5: token-free connected publishing account view (marketing_list_connections). */
+export interface ConnectionView {
+  connectionId: string;
+  label: string;
+  platform: string;
+  environment: "production" | "sandbox";
+  accountRef: string;
+  connectedAt: string;
+  connectedBy: string;
+}
+
+/** W5: publication record (marketing_list_publications). */
+export interface Publication {
+  id: string;
+  artifactId: string;
+  platform: string;
+  idempotencyKey: string;
+  externalPostId?: string;
+  url?: string;
+  approvedBy: string;
+  publishedAt: string;
+  status: "pending" | "published" | "verified" | "failed";
+  assistedHandoff: boolean;
+  connectionId?: string;
+  environment: "production" | "sandbox";
+  verification?: { method: string; verifiedAt: string; detail: string };
+}
+
+/** W6: experiment with its preserved forecast and recorded result. */
+export interface Experiment {
+  id: string;
+  hypothesisId: string;
+  artifactId: string;
+  publicationId: string;
+  goalMetricKey: string;
+  changedVariables: string[];
+  measurementWindowDays: number;
+  startedAt: string;
+  result?: {
+    forecastPreserved: boolean;
+    observedMetricKey: string;
+    observedValue: number;
+    supported: string[];
+    contradicted: string[];
+    completedAt: string;
+  };
+}
+
+export interface SimulationRun {
+  id: string;
+  hypothesisId: string;
+  modelRef: string;
+  projectedRange: { low: number; expected: number; high: number };
+  calibrationHistory: Array<{ evaluatedAt: string; forecastError: number; note: string }>;
+}
+
+export interface NextAction {
+  id: string;
+  experimentId: string;
+  keep: string[];
+  change: string[];
+  recommendation: string;
+  evidence: EvidenceRef[];
+}
+
+/** W5/W6 loop state (marketing_list_publications output). */
+export interface LoopState {
+  publications: Publication[];
+  experiments: Experiment[];
+  simulations: SimulationRun[];
+  nextActions: NextAction[];
+}
+
 export interface AdRow {
   id: string;
   advertiserId?: string;

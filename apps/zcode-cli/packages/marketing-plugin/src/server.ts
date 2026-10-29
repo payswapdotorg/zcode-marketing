@@ -31,6 +31,8 @@ import { MarketingRuntime, MarketingToolError, missionIndexEntry, researchMode }
 import { SERVER_NAME, PLUGIN_VERSION, PANEL_URI, PANEL_MIME } from './serverConstants.js';
 import { createRegistrar } from './toolRegistrar.js';
 import { registerW4Tools } from './w4Tools.js';
+import { registerW5Tools } from './w5Tools.js';
+import { registerW6Tools } from './w6Tools.js';
 
 // Re-exported for the contract tests (import surface unchanged since W3-1).
 export { PLUGIN_NAME, PLUGIN_VERSION, SERVER_NAME, PANEL_URI, PANEL_MIME, SURFACE_ID } from './serverConstants.js';
@@ -507,6 +509,10 @@ export function createMarketingServer(
 
   // W4 creative handoff tools (same registrar contract).
   registerW4Tools(register, runtime);
+
+  // W5 authorized publishing + W6 measurement & closed-loop learning.
+  registerW5Tools(register, runtime);
+  registerW6Tools(register, runtime);
 
   // ---------------------------------------------------------------
   // W3-4 — the workspace panel served as a ui:// resource. The host

@@ -56,17 +56,26 @@ Constraints that apply to every method: never bypass authentication controls, CA
 - **Known constraints (reported in every CoverageReport):** feed carries a rolling window of recent uploads, not history; view counts are current snapshots (history requires the key-based Data API); channel resolution works for channel ids and handles, not arbitrary search terms; private analytics stay out of scope (not_connected).
 - **Status:** **Access path verified: 2026-10-28** — live repeatable test `evidence/2026-10-28-w1-source-access-youtube-public.txt` (15 organic records + 15 real view-count observations ingested idempotently through the connector contract; negative control produced an honest coverage gap). Organic-side verification item of W1-3(a) is satisfied by this row; the key-based Data API row above remains the growth path for per-video history. **Route-availability incident (recorded honestly, 2026-10-29):** during the W1-3(b) verification run the uploads RSS route returned HTTP 404 for many channels — including Wacaco's `UC-y91EU3KtDG_yZuSxeMI6w`, which served the 15 real uploads for both the 2026-10-28 verification and the 2026-10-29 W3-2 run — from plain HTTP AND a full Chrome browser (platform-side partial outage; some mega-channels still served). The connector surfaces this as an explicit `unavailable` coverage gap, never as missing data. The 2026-10-28 verification stands as the recorded evidence; route availability to be re-confirmed at the next live organic use.
 
+### YouTube Data API — connected-account publishing (user-authorized method 3)
+- **Use for:** publishing an APPROVED produced asset through the brand's own connected channel; post-status verification (videos.list); connected-account analytics for W6 measurement.
+- **Connector:** `connector:youtube-publish` (`packages/marketing/src/adapters/sources/youtubePublish.ts`) — capabilities `analytics + publishing` ONLY (`research`/`scheduling`/`paidAds` never implied; calling research is a typed refusal). Wire protocol: the REAL Data API v3 resumable-upload path (POST upload session with Bearer + idempotency key → PUT bytes to the pre-authorized session URL → 201 Video resource) + videos.list for verification + the Analytics API v2 report shapes for permitted measurement.
+- **Idempotency:** one publication per artifact (idempotency key `<artifact>:<mission>:organic`); a persisted record with the same key IS the answer — retries can never duplicate a post (in-process map + persisted PublicationRecord).
+- **Auth hygiene:** the access token lives only in the workspace credential area (`.zcode/marketing/connections.json`) and inside connector requests — never echoed by a tool, never written into mission records (grep-enforced by the plugin tests and the evidence runs).
+- **Environment honesty:** every connection carries an `environment` label (`production`/`sandbox`); a sandbox (test-account) publication is never presented as a production post — the label travels on the publication record, the coverage slices, and the panel.
+- **Verification status (W5):** wire protocol implemented against the real Data API v3 shapes and verified against a local sandbox test endpoint (bearer-validated) through a real spawned server — `evidence/2026-10-29-w5-authorized-publishing.txt`; the assisted/manual path verified LIVE through the keyless public oEmbed route against a real public video. Production googleapis OAuth (a real channel's credentials) is NOT verified in this environment — the connector serves it through the identical code path (`dataBase: https://www.googleapis.com`), and the first production connection will be recorded the same way before any production publication claim.
+
 ### YouTube Analytics API (authorized)
-- **Use for:** deeper metrics for a connected, authorized channel.
-- **Known constraint:** requires OAuth authorization by the channel owner or properly authorized account.
-- **Status:** candidate for user-authorized method (3), W6 scope.
+- **Use for:** deeper metrics for a connected, authorized channel — the W6 permitted-analytics route for measuring the brand's own publications (daily totals, e.g. views).
+- **Known constraint:** requires OAuth authorization by the channel owner or properly authorized account; only permitted metrics for the connected channel's own videos are collected.
+- **Status:** ✅ Verified for the connected-account path (W6, 2026-10-29) — real Analytics API v2 report shapes through the sandbox test account (daily views ingested idempotently, coverage verbatim), `evidence/2026-10-29-w6-closed-loop.txt`; production OAuth pending a real channel.
 
 ### Additional ad libraries and social platforms
 - **Use for:** expand competitor discovery, organic analysis, authorized publishing.
 - **Rule:** each integration is added **only after** Worker A verifies its current access conditions, permitted use, fields, rate limits, and geographic coverage, and records them here.
 
 ### Publishing targets (capability-declared, separate permission domain)
-- TikTok Content Posting API (direct publishing and upload-to-draft, subject to setup and access requirements) — candidate for W5.
+- **YouTube Data API (connected account)** — ✅ verified W5 (2026-10-29): `connector:youtube-publish`, the publishing + analytics capability set, sandbox test account verified through a real spawned server; see the connected-account row above.
+- TikTok Content Posting API (direct publishing and upload-to-draft, subject to setup and access requirements) — candidate for a later wave; connecting an unverified platform is a typed refusal today.
 - Connectors must declare support per operation class: `research`, `analytics`, `publishing`, `scheduling`. **Access to one operation never implies permission for the others.** Organic publishing and paid advertising are separate permission domains; paid execution additionally requires its own approval, budget caps, and audit trail (post-W6 decision).
 
 ## Coverage ledger model (implemented in `packages/marketing`)

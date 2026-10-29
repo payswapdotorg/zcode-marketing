@@ -1,0 +1,112 @@
+================================================================================
+W5 — Authorized publishing: full-chain evidence run
+Date: 2026-10-29 (UTC)  ·  exit code: 0  ·  37 gates
+Reproduce: pnpm --filter @zcode/marketing-plugin demo:w5
+Server: real spawned stdio process (dist/server.mjs).
+Sandbox test account: a LOCAL test endpoint speaking the REAL YouTube Data API
+v3 wire protocol (resumable upload session -> PUT bytes -> videos.list), bearer
+validated like the real endpoint, pointed at through the connection contract
+(dataBase) with environment=sandbox — every publication from it is labeled as a
+test-account post. The byte-PUT to the resumable session is pre-authorized by
+the init call (the real protocol does not repeat the bearer there).
+Assisted/manual path: VERIFIED LIVE through the REAL keyless public oEmbed
+route against a real public video — "Rick Astley - Never Gonna Give You Up"
+resolves; the evidence run substitutes a real public URL for the user's own
+upload (no brand channel in this workspace) and says so in the record notes.
+Wire protocol sequence captured in the transcript ([wire] lines).
+Regression this wave: plugin vitest 53/53 (incl. the W5/W6 chain suite), domain
+publish/rubric 19/19, demo:loop + demo:sqlite all gates, panel browser E2E
+17/17 gates (see 2026-10-29-w5-6-panel-e2e.txt).
+Browser-level loop: evidence/2026-10-29-w5-6-panel-e2e.txt (gates 10-15).
+================================================================================
+
+Sandbox test endpoint (YouTube Data API v3 shapes): http://127.0.0.1:38105
+Connected to marketing MCP server (/home/z/my-project/zcode/apps/zcode-cli/packages/marketing-plugin/dist/server.mjs)
+Workspace: /tmp/w5-chain-BNOkdv
+
+
+== 1. mission + creative chain (W3/W4 tools, demo mode) to an APPROVED produced asset ==
+  ✔ handoff pack drafted
+  ✔ produced asset approved (W4 gate)
+
+== 2. no connection yet — honest refusals + the assisted handoff package ==
+  ✔ publish without a connection refuses (auth_required)
+  ✔ the refusal points at the assisted path
+  ✔ assisted publishing package generated
+  ✔ package carries the asset file location
+  ✔ package steps end at the bring-back tool
+Assisted publishing package for asset-artifact-9-1793275741572:
+- title: I tested portable espresso maker so you don't have to
+- description: Cafe-grade espresso on your commute — no machine needed…
+- tags: zcode-marketing, tested, portable, espresso, maker, have
+- file: ad-v1.mp4 (26 bytes) at .zcode/marketing/missions/mission-w5-chain/assets/asset-1-1793275741562-ad-v1.mp4
+1. open your channel's upload page and select the produced file (.zcode/marketing/missions/mission-w5-chain/assets/asset-1-1793275741562-ad-v1.mp4)
+2. paste the title: "I tested portable espresso maker so you don't have to"
+3. paste the description (hook, proof, CTA lines are pre-composed)
+4. add the tags: zcode-marketing, tested, portable, espresso, maker, have
+5. publish, then record the resulting URL with marketing_record_manual_publication — the system verifies it through the keyless public oEmbed route
+
+== 3. LIVE keyless oEmbed: recording a manual publication against a REAL public video ==
+  ✔ manual publication VERIFIED through the LIVE keyless oEmbed route
+Manual publication recorded for artifact asset-artifact-9-1793275741572: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+VERIFIED through the keyless public route — "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)".
+Next: open the measurement window with marketing_open_experiment.
+
+== 4. marketing_connect_publish_account — sandbox test account, health-checked ==
+  [wire] GET /youtube/v3/videos?part=status&id=dQw4w9WgXcQ (auth present)
+  ✔ a failing health check refuses the connection
+  ✔ unverified platform connectors refuse (data-sources ledger)
+  [wire] GET /youtube/v3/videos?part=status&id=dQw4w9WgXcQ (auth present)
+  ✔ sandbox test account connected and labeled
+  ✔ connection view carries no token
+
+== 5. marketing_publish_asset — resumable upload through the connected account ==
+  ✔ second produced asset approved
+  [wire] POST /upload/youtube/v3/videos?uploadType=resumable&part=snippet,status (auth present)
+  [wire] PUT /upload/resumable/session-1 (auth MISSING)
+  ✔ publish through the connected account succeeded
+  ✔ post identity recorded (sbvid001)
+  ✔ post URL recorded
+  ✔ publication carries the SANDBOX label from the connection
+  ✔ publication records the connection id
+  ✔ direct publication (not assisted)
+Published ad-v2.mp4 (26 bytes) through 'sandbox test channel' — post sbvid001.
+url: https://www.youtube.com/watch?v=sbvid001
+status: published [SANDBOX test account — not a production post]
+idempotency key asset-artifact-9-1793275741651:mission-w5-chain:organic — retries return this same post, never a duplicate.
+Verify the resulting post with marketing_verify_publication; open the measurement window with marketing_open_experiment.
+  ✔ exactly one wire upload (got 1)
+  ✔ the upload authorized with the stored token
+  ✔ idempotency key derived from the artifact
+
+== 6. retry publish — idempotent replay ==
+  ✔ replay returns the SAME publication (idempotentReplay)
+  ✔ same publication id
+  ✔ no second upload on the wire (still 1)
+
+== 7. marketing_verify_publication — connected-account verification ==
+  [wire] GET /youtube/v3/videos?part=status,snippet&id=sbvid001 (auth present)
+  ✔ verification call succeeded
+  ✔ publication status flips to verified
+  ✔ verification method recorded (videos.list route)
+Publication publication-10 verification (sandbox environment): VERIFIED.
+verified through the connected account 'sandbox test channel' (videos.list; uploadStatus processed)
+
+== 8. loop state + persistence (fresh server process) ==
+  ✔ loop state lists publications
+  ✔ both publications persisted (manual + connected)
+Loop state for mission-w5-chain:
+- publication publication-manual-asset-artifact-9-1793275741572-1793275741629 (verified) artifact asset-artifact-9-1793275741572 -> dQw4w9WgXcQ [public-oembed]
+- publication publication-10 (verified, SANDBOX) artifact asset-artifact-9-1793275741651 -> sbvid001 [connected-account]
+  ✔ connected account persisted across restart
+  ✔ sandbox label persisted
+  ✔ publication identity + verified status persisted across restart
+
+== 9. auth hygiene (grep-enforced) ==
+  ✔ no tool output ever echoed the access token
+  ✔ no mission file carries the token ()
+  ✔ connections.json is the canonical credential store
+  ✔ the stored connection points at the sandbox test endpoint
+
+W5 EVIDENCE RUN: ALL GATES PASSED
+

@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { marketingPluginModule } from "./module.js";
 import {
+  MARKETING_CONNECTIONS,
   MARKETING_MISSIONS_INDEX,
   MARKETING_PANEL,
   MARKETING_PANEL_TOOLS,
   MARKETING_PLUGIN_OUTPUTS,
   MARKETING_PLUGIN_SKILL,
+  MARKETING_PUBLISHING_TOOLS,
   MARKETING_TOOLS,
   type MarketingPluginContract,
 } from "./contract.js";
@@ -28,8 +30,13 @@ describe("marketing-plugin contract", () => {
     ]);
   });
 
-  it("keeps the tool roster free of publishing tools (W5 scope, separate permission domain)", () => {
-    expect(MARKETING_TOOLS.every((name) => !name.includes("publish"))).toBe(true);
+  it("scopes publishing to the closed organic tool set — never paid campaign execution", () => {
+    // W5 起 publishing 进入工具集，但它是闭合清单：organic 发布工具全部在册，
+    // 且没有任何 paidAds / campaign / spend 执行工具 —— 两个权限域永不互含。
+    expect(MARKETING_PUBLISHING_TOOLS.every((name) => MARKETING_TOOLS.includes(name))).toBe(true);
+    expect(
+      MARKETING_TOOLS.filter((name) => /paid|campaign|spend|ads_/i.test(name)),
+    ).toEqual([]);
   });
 
   it("declares the workspace panel surface exactly once, on the marketing server", () => {
@@ -42,6 +49,7 @@ describe("marketing-plugin contract", () => {
 
   it("roots every mission artifact under the workspace .zcode/marketing directory", () => {
     expect(MARKETING_MISSIONS_INDEX.startsWith(".zcode/marketing/")).toBe(true);
+    expect(MARKETING_CONNECTIONS.startsWith(".zcode/marketing/")).toBe(true);
   });
 
   it("assembles through the public example exactly like the hosted entry", async () => {
@@ -62,6 +70,7 @@ describe("marketing-plugin contract", () => {
             missionDb: ".zcode/marketing/missions/<missionId>.sqlite",
             missionArtifacts: ".zcode/marketing/missions/<missionId>-artifacts.json",
             missionAssets: ".zcode/marketing/missions/<missionId>/assets/",
+            connections: MARKETING_CONNECTIONS,
           },
           modelChannel: {
             provenancePrefix: "zcode:routed:",

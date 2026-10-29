@@ -88,12 +88,27 @@ export interface ResearchPage {
   accessMethod: AccessMethod;
 }
 
+/** Platform metadata + bytes for a direct publish (W5). */
+export interface PublishAsset {
+  bytes: Uint8Array;
+  mimeType: string;
+  title: string;
+  description: string;
+  tags: string[];
+  privacyStatus: 'public' | 'unlisted' | 'private';
+}
+
 export interface PublishRequest {
   missionId: string;
   artifactId: string;
   /** Idempotency key — retrying the same publish must not duplicate the post. */
   idempotencyKey: string;
   approvedBy: string;
+  /**
+   * W5: the asset to publish (bytes + platform metadata composed from the
+   * artifact's pack). Absent for assisted handoff — nothing to upload.
+   */
+  asset?: PublishAsset;
 }
 
 export interface PublishOutcome {
@@ -103,14 +118,47 @@ export interface PublishOutcome {
   assistedHandoff: boolean;
 }
 
+/** Post-status verification result (W5 gate: verify the resulting post). */
+export interface PublicationVerification {
+  exists: boolean;
+  /** Platform-reported upload/processing state when the account route is used. */
+  uploadStatus?: string;
+  privacyStatus?: string;
+  title?: string;
+  publishedAt?: string;
+  detail: string;
+}
+
+/** Authorized-account analytics request (W6; present iff capabilities.analytics). */
+export interface AnalyticsRequest {
+  missionId: string;
+  /** External post ids (platform identities) to collect for. */
+  subjectExternalIds: string[];
+  metrics: string[];
+  from: string;
+  to: string;
+}
+
+export interface AnalyticsPage {
+  observations: MetricObservation[];
+  /** Honest per-slice coverage for THIS response — mandatory, never empty. */
+  coverage: CoverageSlice[];
+  accessMethod: AccessMethod;
+}
+
 /**
  * The connector port. research() is required iff capabilities.research;
- * publish() iff capabilities.publishing. Adapters own all I/O.
+ * publish() iff capabilities.publishing; analytics() iff capabilities.analytics;
+ * verifyPublication() iff capabilities.publishing. Adapters own all I/O.
  */
 export interface MarketingConnector {
   readonly meta: ConnectorMeta;
   research(request: ResearchRequest): Promise<ResearchPage>;
   publish?(request: PublishRequest): Promise<PublishOutcome>;
+  /** Post-status verification through the connected account (W5 gate). */
+  verifyPublication?(input: { externalPostId: string }): Promise<PublicationVerification>;
+  /** Authorized-account analytics (W6). */
+  analytics?(request: AnalyticsRequest): Promise<AnalyticsPage>;
   healthCheck(): Promise<{ ok: boolean; detail: string }>;
 }
 

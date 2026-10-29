@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@zcode/marketing-plugin",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Built-in marketing intelligence plugin: evidence-backed competitor research, creative analysis, and opportunity ranking through the marketing mission tools.",
   "license": "Apache-2.0",
@@ -16,7 +16,9 @@
     "demo:w3-2": "pnpm build && node scripts/w3-2-sampling-chain.mjs",
     "demo:w3-3": "pnpm build && node scripts/w3-3-run-all.mjs",
     "demo:w3-4": "pnpm build && node scripts/w3-4-panel-e2e.mjs",
-    "demo:w4": "pnpm build && node scripts/w4-chain.mjs"
+    "demo:w4": "pnpm build && node scripts/w4-chain.mjs",
+    "demo:w5": "pnpm build && node scripts/w5-chain.mjs",
+    "demo:w6": "pnpm build && node scripts/w6-chain.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",

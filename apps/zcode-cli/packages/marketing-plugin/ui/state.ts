@@ -4,7 +4,7 @@
  * plain modules instead of a framework, per the office-panel "no React for
  * simple surfaces" decision recorded in docs/plugins/.
  */
-import { en, type Brief, type CreativeState, type Evidence, type MissionEntry, type Report, type Strings } from "./types.ts";
+import { en, type Brief, type ConnectionView, type CreativeState, type Evidence, type LoopState, type MissionEntry, type Report, type Strings } from "./types.ts";
 
 export interface PanelNotice {
   kind: "info" | "warn" | "error";
@@ -16,10 +16,12 @@ export const S = {
   strings: en as Strings,
   missions: [] as MissionEntry[],
   selectedId: null as string | null,
-  tab: "report" as "report" | "evidence" | "creative",
+  tab: "report" as "report" | "evidence" | "creative" | "loop",
   report: null as Report | null,
   evidence: null as Evidence | null,
   creative: null as CreativeState | null,
+  connections: [] as ConnectionView[],
+  loop: null as LoopState | null,
   loading: false,
   notice: null as PanelNotice | null,
   discoverBusy: false,
@@ -28,6 +30,10 @@ export const S = {
   draftBusy: false,
   reviewBusy: "" as string,
   recordBusy: false,
+  connectBusy: false,
+  publishBusy: "" as string,
+  measureBusy: "" as string,
+  outcomeBusy: "" as string,
 };
 
 /** Current mission entry according to selection (falls back to the first). */

@@ -1,0 +1,44 @@
+================================================================================
+Marketing workspace panel — browser E2E, W3-4 + W4 + W5/W6 gates
+Date: 2026-10-29 (UTC)  ·  exit code: 0  ·  17 gates, no page errors
+Reproduce: pnpm --filter @zcode/marketing-plugin demo:w3-4
+Browser: real Chromium (143) through the MCP Apps AppBridge host — the panel
+iframe runs under the ZCode desktop sandbox CSP, talking to the REAL bundled
+plugin server over /rpc (bridge proxies tool calls exactly like the host).
+W5/W6 gates (10-15) drive the loop THROUGH THE RENDERED PANEL: connect a
+sandbox test account (health-checked against the script's local wire endpoint,
+bearer validated), publish the approved asset (idempotent — agent-side retry
+proves no duplicate), verify the post, open the measurement window, collect
+permitted analytics, record the outcome with the declared proxy baseline —
+the [PROXY] label, the appended calibration history, and the grounded
+next-experiment recommendation all render.
+Visual artifacts: docs/marketing/evidence-artifacts/01..09 (08-loop-measuring,
+09-loop-closed are the W5/W6 surfaces).
+================================================================================
+
+marketing workspace panel — browser E2E gates (W3-4 + W4 + W5/W6)
+server: /home/z/my-project/zcode/apps/zcode-cli/packages/marketing-plugin/dist/server.mjs (real bundled plugin process)
+panel: ui://marketing/panel.html (649 KiB self-contained resource)
+browser: chromium 143.0.7499.4 — MCP Apps AppBridge host, desktop sandbox CSP
+artifacts: /home/z/my-project/zcode/docs/marketing/evidence-artifacts
+
+PASS  panel-connects-and-renders-hero — onboarding form visible after MCP Apps handshake
+PASS  onboarding-form-starts-mission — mission view renders the persisted brief
+PASS  panel-discovery-confirms-competitors — 2 candidates user-confirmed and persisted
+PASS  panel-research-renders-coverage — coverage slices rendered: unavailable, unavailable, unavailable, not_connected, available, restricted
+PASS  evidence-tab-renders-provenance — 3 provenance tables rendered
+PASS  agent-tool-result-refreshes-panel — mission list updated from a forwarded tool result, no panel action
+PASS  report-renders-ranked-opportunities — 1 opportunities with 5 separated score chips (observed / cross-source / predicted / confidence)
+PASS  panel-drafts-creative-handoff-pack — handoff pack renders with timed script beats, prompt packs and provenance
+PASS  panel-review-approves-pack — explicit approval flips the artifact status to approved
+PASS  panel-records-asset-with-rubric — chunked import + declaration recorded; 8 rubric checks rendered with the file in the mission workspace
+PASS  panel-connects-sandbox-account — health-checked account connected, sandbox-labeled, token-free row rendered
+PASS  panel-publishes-through-connected-account — idempotent upload (1 wire POST+PUT), post identity + SANDBOX badge rendered
+PASS  panel-idempotent-replay-single-publication — agent retry returned the same publication; panel still shows exactly one
+PASS  panel-verifies-publication — connected-account verification (videos.list) flips the chip to verified
+PASS  panel-measures-and-collects-analytics — window opened on the W4 spec; permitted analytics rendered (views = 5400)
+PASS  panel-records-outcome-and-closes-loop — [PROXY]-labeled comparison against the declared proxy baseline, appended calibration, grounded recommendation — all rendered
+PASS  no-page-errors — clean console
+
+no page errors
+

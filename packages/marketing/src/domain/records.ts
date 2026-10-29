@@ -269,6 +269,27 @@ export const publicationRecord = z.object({
   status: z.enum(['pending', 'published', 'verified', 'failed']),
   /** Assisted handoff when no direct publishing integration is available. */
   assistedHandoff: z.boolean().default(false),
+  /**
+   * W5: which connected account published (id from the connection store).
+   * Absent for assisted/manual publications (no connected account involved).
+   */
+  connectionId: z.string().min(1).optional(),
+  /**
+   * W5 honesty label inherited from the connection: 'sandbox' marks a
+   * test-account publication (never presented as a production post).
+   */
+  environment: z.enum(['production', 'sandbox']).default('production'),
+  /**
+   * W5 post-status verification: how the resulting post was verified and
+   * when. Absent while a publication is still unverified.
+   */
+  verification: z
+    .object({
+      method: z.enum(['connected-account', 'public-oembed', 'user-attested']),
+      verifiedAt: isoDateTime,
+      detail: z.string().min(1),
+    })
+    .optional(),
 });
 export type PublicationRecord = z.infer<typeof publicationRecord>;
 

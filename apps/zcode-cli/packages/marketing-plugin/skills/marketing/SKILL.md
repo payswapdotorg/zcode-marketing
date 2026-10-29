@@ -1,6 +1,6 @@
 ---
 name: marketing
-description: Evidence-backed marketing intelligence missions — describe a product, research competitors on a platform, extract creative structure, and produce an explicit-gap report with explainable, cross-source opportunities. Use when the user wants competitive research, ad/creative analysis, or a content strategy grounded in observed evidence.
+description: Evidence-backed marketing intelligence missions — describe a product, research competitors on a platform, extract creative structure, and produce an explicit-gap report with explainable, cross-source opportunities; then take a recommendation through creative production, publish it through a connected (test) account or the assisted path, measure the result, and ground the next experiment in the recorded outcome. Use when the user wants competitive research, ad/creative analysis, a content strategy grounded in observed evidence, or to run the full learn loop.
 ---
 
 # Marketing intelligence mission
@@ -63,13 +63,17 @@ The plugin ships a branded Marketing panel (`ui://marketing/panel.html`, the
 office-panel convention): mission list, onboarding form, competitor discovery
 and confirmation, one-click idempotent research, the honest coverage report,
 performance signals, ranked opportunities with separated scores, the full
-evidence trail with provenance, and (W4) the Creative tab — hypotheses with
+evidence trail with provenance, (W4) the Creative tab — hypotheses with
 "Draft handoff pack", the pack cards (timed script, storyboard, prompt packs,
 experiment spec), explicit approve/reject, the bring-back form (chunked file
-import + declaration) with the versioned rubric report. Panel-routed tools
-declare `_meta.ui.resourceUri` so the host forwards their results to the
-surface — the panel refreshes as you work. The panel calls the same tools you
-do; there is no parallel data path.
+import + declaration) with the versioned rubric report — and (W5/W6) the
+Publish & Measure tab — connected accounts (sandbox-labeled), publish /
+assisted package, publication verification, the measurement window, permitted
+analytics, and the outcome form whose result renders the [PROXY]-labeled
+comparison, the appended calibration history, and the next-experiment
+recommendation. Panel-routed tools declare `_meta.ui.resourceUri` so the
+host forwards their results to the surface — the panel refreshes as you work.
+The panel calls the same tools you do; there is no parallel data path.
 
 ## Creative handoff (W4)
 
@@ -98,6 +102,57 @@ After `marketing_rank_opportunities` (hypotheses persist with stable ids):
 5. **Compare** — `marketing_compare_assets` for the side-by-side rubric
    verdicts across recorded assets before choosing what to publish.
 
+## Authorized publishing (W5)
+
+Publishing requires an APPROVED produced asset — the W4 approval is the gate.
+Organic publishing NEVER implies paid campaign execution (separate permission
+domain, not implemented).
+
+1. **Connect an account** — `marketing_connect_publish_account` (youtube is
+   the verified platform). The account is health-checked BEFORE it is
+   persisted; one connection per platform. The access token lives only in the
+   workspace credential area — never echoed, never written to mission records.
+   A `sandbox`-labeled connection (test account / test endpoint) publishes
+   test-account posts, and every publication carries the label — never present
+   a sandbox post as a production post.
+2. **Publish** — `marketing_publish_asset` (direct, through the connected
+   account) — idempotent per artifact: one publication per artifact, and a
+   retry returns the SAME publication (never a duplicate post). The post
+   identity (external id + URL) is recorded on the publication.
+3. **Assisted path** (no connected account / unverified platform) —
+   `marketing_assisted_handoff` produces the copy-ready package (title,
+   description, tags, the asset file location, upload steps); after the user
+   publishes manually, `marketing_record_manual_publication` brings the post
+   back — VERIFIED through the keyless public oEmbed route when the URL
+   resolves; an unresolvable URL records as user-attested only, never as
+   verified.
+4. **Verify** — `marketing_verify_publication` re-checks the post
+   (connected-account route for direct publications, keyless public route for
+   manual ones) and records HOW it was verified.
+
+## Measurement and closed-loop learning (W6)
+
+1. **Open the window** — `marketing_open_experiment` on a publication
+   (idempotent). The experiment tests exactly what the pack's experimentSpec
+   declared (changed variables + window days) and binds the hypothesis's
+   PRESERVED forecast — compared later verbatim, never rewritten.
+2. **Collect permitted analytics** — `marketing_collect_analytics` for
+   connected-account publications (daily totals through the authorized
+   analytics route; idempotent ingest; coverage verbatim). Manual publications
+   have no connected-account analytics — record the outcome from what the user
+   can actually observe.
+3. **Record the outcome** — `marketing_record_outcome`. If the observed
+   metric IS the goal metric, the preserved forecast compares directly. If the
+   goal metric is not observable and the outcome was observed on a PROXY
+   metric, you MUST declare the proxy baseline (`proxyForecast`
+   low/expected/high on that metric) — comparing a proxy value against the
+   goal metric's range would mix units; without a baseline the recording is
+   refused. The comparison carries the `[PROXY]` label, the calibration entry
+   is APPENDED (never overwritten), and the next-experiment recommendation is
+   grounded in the recorded result (the observation source rides along as
+   evidence). One outcome per experiment — the next iteration comes from the
+   recommendation, never from a blind repeat.
+
 ## Honesty rules
 
 - Coverage gaps are stated, never papered over. A `[restricted]` or
@@ -112,6 +167,8 @@ After `marketing_rank_opportunities` (hypotheses persist with stable ids):
   analysis.
 - Never claim a number the evidence store does not contain; use
   `marketing_evidence_view` to check before asserting.
-- Publishing tools do not exist in this wave. If the user wants to publish,
-  say that authorized publishing arrives with W5 and needs explicit approval
-  controls.
+- Publishing requires the explicit W4 approval and (for direct publishing) a
+  health-checked connected account. A sandbox (test-account) publication is
+  always labeled as such; a user-attested manual URL is never reported as
+  verified. Paid campaign execution does not exist in this plugin — say so if
+  asked; organic publishing never implies it.

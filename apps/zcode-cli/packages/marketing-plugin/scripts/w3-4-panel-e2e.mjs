@@ -14,6 +14,14 @@
 //   6. agent-side activity reaches the panel: a tool result pushed through the
 //      bridge (the way the real host forwards server tool results) refreshes
 //      the mission list without any panel-side action.
+//   7-9 (W4): the creative handoff driven through the panel — draft pack,
+//      explicit approval, chunked bring-back with the rubric report.
+//   10-15 (W5/W6): the loop driven through the panel — connect a sandbox test
+//      account (health-checked against this script's local wire endpoint),
+//      publish the approved asset (idempotent — replay adds no post), verify
+//      the post, open the measurement window, collect permitted analytics,
+//      record the outcome → [PROXY]-labeled comparison + calibration + the
+//      grounded next-experiment recommendation, all rendered.
 //
 // Artifacts (screenshots) go to $MARKETING_E2E_ARTIFACTS or a temp dir.
 // Run: pnpm --filter @zcode/marketing-plugin demo:w3-4
@@ -35,6 +43,8 @@ const artifacts =
   process.env.MARKETING_E2E_ARTIFACTS || join(tmpdir(), "marketing-panel-e2e");
 await mkdir(artifacts, { recursive: true });
 const workspace = await mkdtemp(join(tmpdir(), "marketing-panel-ws-"));
+const SANDBOX_TOKEN = "sandbox-test-token-DO-NOT-ECHO-panel-e2e";
+const wire = { uploads: 0 };
 
 if (!existsSync(join(plugin, "dist", "server.mjs")) || !existsSync(join(plugin, "dist", "panel.html")))
   throw new Error("dist/server.mjs or dist/panel.html missing — run pnpm build first");
@@ -107,6 +117,62 @@ frame.src = '/panel';
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, "http://localhost");
+    // W5/W6 gates: the local sandbox test-account endpoint — the REAL YouTube
+    // Data API v3 + Analytics API v2 wire shapes, pointed at by the connected
+    // (sandbox-labeled) account exactly like a real test endpoint. The bearer
+    // is validated on every route except the pre-authorized resumable session.
+    const isSessionUpload = request.method === "PUT" && url.pathname.startsWith("/upload/resumable/");
+    const wireJson = (status, body, headers = {}) => {
+      response.writeHead(status, { "Content-Type": "application/json", ...headers });
+      response.end(body);
+    };
+    if (
+      url.pathname === "/youtube/v3/videos" ||
+      url.pathname === "/upload/youtube/v3/videos" ||
+      url.pathname.startsWith("/upload/resumable/") ||
+      url.pathname === "/v2/reports"
+    ) {
+      if (!isSessionUpload && request.headers.authorization !== `Bearer ${SANDBOX_TOKEN}`) {
+        wireJson(401, JSON.stringify({ error: { code: 401, message: "Invalid Credentials" } }));
+        return;
+      }
+      if (request.method === "POST" && url.pathname === "/upload/youtube/v3/videos") {
+        wire.uploads += 1;
+        wireJson(200, "", { Location: `http://127.0.0.1:${server.address().port}/upload/resumable/session-${wire.uploads}` });
+        return;
+      }
+      if (isSessionUpload) {
+        const chunks = [];
+        request.on("data", (chunk) => chunks.push(chunk));
+        request.on("end", () =>
+          wireJson(201, JSON.stringify({
+            id: "sbvid001",
+            snippet: { title: "sandbox test upload", publishedAt: new Date().toISOString() },
+            status: { uploadStatus: "processed", privacyStatus: "public" },
+          })));
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/youtube/v3/videos") {
+        wireJson(200, JSON.stringify({
+          items: [{
+            id: "sbvid001",
+            snippet: { title: "sandbox test upload", publishedAt: new Date().toISOString() },
+            status: { uploadStatus: "processed", privacyStatus: "public" },
+          }],
+        }));
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/v2/reports") {
+        wireJson(200, JSON.stringify({
+          columnHeaders: [
+            { name: "day", columnType: "DIMENSION", dataType: "STRING" },
+            { name: "views", columnType: "METRIC", dataType: "INTEGER" },
+          ],
+          rows: [["2026-10-23", "1200"], ["2026-10-24", "3100"], ["2026-10-25", "5400"]],
+        }));
+        return;
+      }
+    }
     if (url.pathname === "/") {
       response.setHeader("Content-Type", "text/html; charset=utf-8");
       response.end(
@@ -177,6 +243,7 @@ try {
   await frame.fill('#start-form input[name="audience"]', "commuting coffee drinkers");
   await frame.fill('#start-form input[name="country"]', "US");
   await frame.fill('#start-form input[name="offer"]', "30-day home trial");
+  await frame.selectOption('#start-form select[name="objective"]', "sales");
   await frame.selectOption('#start-form select[name="researchMode"]', "demo");
   await frame.locator('#start-form button[type="submit"]').click();
   await frame.locator("#discover-form").waitFor({ timeout: 20000 });
@@ -341,6 +408,129 @@ try {
   });
   await shotFull("07-creative-asset-recorded.png");
 
+  // ---------------------------------------------------------------------
+  // W5/W6 gates: the loop driven through the panel in the browser.
+  // ---------------------------------------------------------------------
+  // The recorded asset is in review — approve it through the panel first.
+  await frame.locator("[data-review-approve]").first().click();
+  await frame
+    .locator(".state", { hasText: "approved" })
+    .nth(1)
+    .waitFor({ timeout: 15000 });
+
+  // Gate 10: connect a sandbox test account through the panel form.
+  await frame.locator('[data-tab="loop"]').click();
+  await frame.locator("#connect-account-form").waitFor({ timeout: 15000 });
+  await frame.fill('#connect-account-form input[name="label"]', "sandbox test channel");
+  await frame.fill('#connect-account-form input[name="accountRef"]', "UCsandbox00000000000000AA");
+  await frame.fill('#connect-account-form input[name="dataBase"]', `http://127.0.0.1:${server.address().port}`);
+  await frame.fill('#connect-account-form input[name="accessToken"]', SANDBOX_TOKEN);
+  await frame.selectOption('#connect-account-form select[name="environment"]', "sandbox");
+  await frame.locator('#connect-account-form button[type="submit"]').click();
+  await frame
+    .locator(".card", { hasText: "Connected publishing accounts" })
+    .locator(".state", { hasText: "sandbox" })
+    .waitFor({ timeout: 20000 });
+  const connectionRows = await frame
+    .locator('.card:has-text("Connected publishing accounts") .row')
+    .count();
+  assert.equal(connectionRows, 1, `expected 1 connected account, got ${connectionRows}`);
+  gate("panel-connects-sandbox-account", true, "health-checked account connected, sandbox-labeled, token-free row rendered");
+
+  // Gate 11: publish the approved asset through the panel (resumable upload
+  // through the connected account; the wire endpoint sees exactly one upload).
+  await frame.locator("[data-publish]").first().click();
+  await frame
+    .locator(".card", { hasText: "Publications" })
+    .locator(".state", { hasText: "published" })
+    .first()
+    .waitFor({ timeout: 30000 });
+  assert.equal(wire.uploads, 1, `expected exactly 1 wire upload, got ${wire.uploads}`);
+  const sandboxBadge = await frame
+    .locator(".card", { hasText: "Publications" })
+    .getByText("SANDBOX test account")
+    .count();
+  assert.ok(sandboxBadge > 0, "the publication renders the SANDBOX test-account badge");
+  gate("panel-publishes-through-connected-account", true, "idempotent upload (1 wire POST+PUT), post identity + SANDBOX badge rendered");
+
+  // Gate 12: agent-side retry replay — no duplicate post, panel stays at 1.
+  const replay = await call("marketing_publish_asset", {
+    missionId: first.missionId,
+    artifactId: (
+      (await call("marketing_list_artifacts", { missionId: first.missionId }))
+        .structuredContent.artifacts.find((a) => a.kindOf === "uploadedAsset")
+    ).id,
+    approvedBy: "marketing lead",
+  });
+  assert.equal(replay.structuredContent.idempotentReplay, true, "retry must be an idempotent replay");
+  assert.equal(wire.uploads, 1, `replay must not hit the wire again (uploads=${wire.uploads})`);
+  await outer.evaluate((result) => window.__sendToolResult(result), replay);
+  const publicationRows = await frame
+    .locator('.card:has-text("Publications") .row')
+    .count();
+  assert.equal(publicationRows, 1, `expected exactly 1 publication row, got ${publicationRows}`);
+  gate("panel-idempotent-replay-single-publication", true, "agent retry returned the same publication; panel still shows exactly one");
+
+  // Gate 13: verify the post from the panel → status flips to verified.
+  await frame.locator("[data-verify]").first().click();
+  await frame
+    .locator(".card", { hasText: "Publications" })
+    .locator(".state", { hasText: "verified" })
+    .first()
+    .waitFor({ timeout: 30000 });
+  gate("panel-verifies-publication", true, "connected-account verification (videos.list) flips the chip to verified");
+
+  // Gate 14: open the measurement window + collect permitted analytics.
+  await frame.locator("[data-open-experiment]").first().click();
+  await frame
+    .locator(".card", { hasText: "Experiment" })
+    .first()
+    .waitFor({ timeout: 30000 });
+  const goalMetric = await frame
+    .locator('.card:has-text("Experiment") .kv dd')
+    .first()
+    .textContent();
+  assert.match(String(goalMetric), /attributedConversions/, "experiment binds the objective metric");
+  await frame.locator("[data-collect]").first().click();
+  await frame
+    .locator(".notice", { hasText: "views = 5400" })
+    .waitFor({ timeout: 30000 });
+  gate("panel-measures-and-collects-analytics", true, "window opened on the W4 spec; permitted analytics rendered (views = 5400)");
+  await shotFull("08-loop-measuring.png");
+
+  // Gate 15: record the outcome → the loop closes, rendered.
+  const outcomeForm = frame.locator("form[id^='record-outcome-form-']").first();
+  await outcomeForm.locator('input[name="observedValue"]').fill("5400");
+  await outcomeForm.locator('select[name="observedMetricKey"]').selectOption("views");
+  await outcomeForm.locator('input[name="proxyLow"]').fill("3000");
+  await outcomeForm.locator('input[name="proxyExpected"]').fill("5000");
+  await outcomeForm.locator('input[name="proxyHigh"]').fill("9000");
+  await outcomeForm.locator('input[name="sourceNote"]').fill("connected-account analytics (sandbox test channel)");
+  await outcomeForm.locator('button[type="submit"]').click();
+  await frame
+    .locator(".card", { hasText: "Experiment" })
+    .locator(".state", { hasText: "completed" })
+    .first()
+    .waitFor({ timeout: 30000 });
+  const proxyChip = await frame.locator(".card", { hasText: "Experiment" }).getByText("[PROXY]").count();
+  assert.ok(proxyChip > 0, "the [PROXY] label renders on the recorded outcome");
+  const calibration = await frame
+    .locator(".card", { hasText: "Experiment" })
+    .getByText("Calibration history (appended, never overwritten)")
+    .count();
+  assert.ok(calibration > 0, "the appended calibration history renders");
+  const recommendation = await frame
+    .locator(".card", { hasText: "Experiment" })
+    .getByText("Next experiment (grounded in the recorded result)")
+    .count();
+  assert.ok(recommendation > 0, "the grounded next-experiment recommendation renders");
+  gate(
+    "panel-records-outcome-and-closes-loop",
+    true,
+    "[PROXY]-labeled comparison against the declared proxy baseline, appended calibration, grounded recommendation — all rendered",
+  );
+  await shotFull("09-loop-closed.png");
+
   gate("no-page-errors", errors.length === 0, errors.length ? errors.join(" | ") : "clean console");
 } catch (error) {
   gates.push(`FAIL  unexpected-error — ${String(error)}`);
@@ -349,7 +539,7 @@ try {
   await outer.screenshot({ path: join(artifacts, "99-failure.png"), fullPage: true }).catch(() => undefined);
 } finally {
   const summary = [
-    "W3-4 + W4 marketing workspace panel — browser E2E gates",
+    "marketing workspace panel — browser E2E gates (W3-4 + W4 + W5/W6)",
     `server: ${join(plugin, "dist/server.mjs")} (real bundled plugin process)`,
     `panel: ui://marketing/panel.html (${(Buffer.byteLength(html) / 1024).toFixed(0)} KiB self-contained resource)`,
     `browser: chromium ${browser.version()} — MCP Apps AppBridge host, desktop sandbox CSP`,

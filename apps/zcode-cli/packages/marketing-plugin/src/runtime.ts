@@ -10,7 +10,7 @@
  * Layering: `@zcode/marketing` public entrypoint only. All file I/O lives here
  * (adapters-equivalent boundary of the plugin), never in domain code.
  */
-import { mkdir, readFile, writeFile, open, unlink, readdir, stat } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import {
@@ -21,12 +21,17 @@ import {
   SampleConnector,
   SqliteTemporalStore,
   YoutubePublicConnector,
+  YoutubePublishConnector,
   GoogleAdsTransparencyConnector,
   competitorCandidate,
   coverageReport,
   creativeArtifact,
   creativeHypothesis,
+  experimentRecord,
+  nextAction,
   productBrief,
+  publicationRecord,
+  simulationRun,
 } from '@zcode/marketing';
 import type {
   AdCreative,
@@ -39,10 +44,18 @@ import type {
   ModelPort,
   OrganicContent,
   ProductBrief,
+  PublishingConnection,
   TemporalStorePort,
 } from '@zcode/marketing';
 import type { TransparencyFetchLike } from '@zcode/marketing';
 import { McpSamplingModel, type SamplingClient } from './samplingModel.js';
+import { ConnectionStore, type ConnectionView, type ConnectAccountInput } from './connections.js';
+import { MarketingToolError } from './errors.js';
+import { AssetImportSessions } from './assetImport.js';
+
+export { MarketingToolError } from './errors.js';
+export { connectionEntry, ConnectionStore } from './connections.js';
+export type { ConnectionEntry, ConnectionView, ConnectAccountInput } from './connections.js';
 
 export const researchMode = z.enum(['live', 'demo']);
 export type ResearchMode = z.infer<typeof researchMode>;
@@ -71,6 +84,11 @@ const missionIndexFile = z.object({
  * W4 persisted creative state: ranked hypotheses (so a draft can reference the
  * exact opportunity the user picked, by id, across processes) and the creative
  * artifacts (prompt packs, uploaded assets + their rubric reports).
+ *
+ * W5/W6: the same file carries the mission's loop state — publication records
+ * (idempotency-keyed, environment-labeled), experiments (preserved forecasts +
+ * recorded results), simulations (appended calibration history) and next
+ * actions. All arrays default empty, so pre-W5 files parse unchanged.
  */
 export const missionArtifactsFile = z.object({
   kind: z.literal('marketing-mission-artifacts'),
@@ -78,8 +96,18 @@ export const missionArtifactsFile = z.object({
   missionId: z.string().min(1),
   hypotheses: z.array(creativeHypothesis).default([]),
   artifacts: z.array(creativeArtifact).default([]),
+  publications: z.array(publicationRecord).default([]),
+  experiments: z.array(experimentRecord).default([]),
+  simulations: z.array(simulationRun).default([]),
+  nextActions: z.array(nextAction).default([]),
 });
 export type MissionArtifactsFile = z.infer<typeof missionArtifactsFile>;
+
+/**
+ * W5 connected publishing accounts live in their own store module
+ * (connections.ts) — schema, validation, and token-free views. Re-exported
+ * above for the existing import surface.
+ */
 
 export interface LoadedMission {
   entry: MissionIndexEntry;
@@ -111,8 +139,11 @@ const unionCapabilities = (connectors: MarketingConnector[]): ConnectorMeta['cap
  * Composite connector — merges research pages from already-verified connectors
  * and keeps every child's coverage slices verbatim (never massaged). It exists
  * so a mission can combine an organic source with an ad-intelligence source
- * without any connector bypassing PLATFORM-CONNECTOR-CONTRACT.md. Publishing is
- * not delegated in this wave (no child declares it).
+ * without any connector bypassing PLATFORM-CONNECTOR-CONTRACT.md.
+ *
+ * W5/W6: publish() / verifyPublication() delegate to the (single) child that
+ * declares publishing; analytics() merges the pages of children that declare
+ * analytics — always through the child connector's own contract.
  */
 export class CompositeConnector implements MarketingConnector {
   readonly meta: ConnectorMeta;
@@ -154,6 +185,52 @@ export class CompositeConnector implements MarketingConnector {
     };
   }
 
+  /** W5: delegated to the child that declares publishing (at most one per platform). */
+  async publish(request: Parameters<NonNullable<MarketingConnector['publish']>>[0]) {
+    const child = this.children.find((c) => c.meta.capabilities.publishing && c.publish);
+    if (!child?.publish) {
+      throw new MarketingToolError(
+        'auth_required',
+        'no connected publishing account for this platform — connect one with marketing_connect_publish_account, or use the assisted handoff path (marketing_assisted_handoff)',
+      );
+    }
+    return child.publish(request);
+  }
+
+  /** W5: post-status verification through the same child that publishes. */
+  async verifyPublication(input: { externalPostId: string }) {
+    const child = this.children.find(
+      (c) => c.meta.capabilities.publishing && c.verifyPublication,
+    );
+    if (!child?.verifyPublication) {
+      throw new MarketingToolError(
+        'auth_required',
+        'no connected publishing account for this platform — verification through the connected account requires one',
+      );
+    }
+    return child.verifyPublication(input);
+  }
+
+  /** W6: analytics pages merged from every child that declares the capability. */
+  async analytics(request: Parameters<NonNullable<MarketingConnector['analytics']>>[0]) {
+    const analyticsChildren = this.children.filter((c) => c.meta.capabilities.analytics && c.analytics);
+    if (analyticsChildren.length === 0) {
+      throw new MarketingToolError(
+        'auth_required',
+        'no connected analytics source for this platform — connected-account analytics require a publishing connection (marketing_connect_publish_account); for manual publications record the observed outcome with marketing_record_outcome (cite the source)',
+      );
+    }
+    const pages = [];
+    for (const child of analyticsChildren) {
+      pages.push(await child.analytics!(request));
+    }
+    return {
+      observations: pages.flatMap((p) => p.observations),
+      coverage: pages.flatMap((p) => p.coverage),
+      accessMethod: pages[0]?.accessMethod ?? ('authorizedAccount' as const),
+    };
+  }
+
   async healthCheck(): Promise<{ ok: boolean; detail: string }> {
     const results = await Promise.all(
       this.children.map(async (c) => {
@@ -171,31 +248,36 @@ export interface RuntimeOptions {
   fetchLike?: (url: string) => Promise<{ status: number; body: string }>;
   /** Injectable POST fetch so the transparency connector stays offline in tests. */
   transparencyFetchLike?: TransparencyFetchLike;
+  /** Injectable fetch so the publishing connector stays offline in tests (W5). */
+  publishFetchLike?: import('@zcode/marketing').PublishFetchLike;
 }
 
 /** One in-flight chunked asset import (W4): the panel streams base64 chunks. */
-interface ImportSession {
-  id: string;
-  missionId: string;
-  name: string;
-  declaredBytes: number;
-  received: number;
-  handle: import('node:fs/promises').FileHandle;
-  path: string;
-}
 
 export class MarketingRuntime {
   private readonly dir: string;
   private readonly loaded = new Map<string, LoadedMission>();
-  private readonly imports = new Map<string, ImportSession>();
-  private importCounter = 0;
+  /** W4: chunked asset import sessions (office begin/write/finish convention). */
+  private readonly imports: AssetImportSessions;
+  /** W5: connected publishing accounts (token-free views via store.views()). */
+  readonly connections: ConnectionStore;
   /** Late-bound host sampling channel (W3-2): set by main() after the MCP
    * initialize handshake when the host declared the `sampling` capability. */
   private sampling?: SamplingClient;
   private modelPort?: ModelPort;
 
-  constructor(workspaceRoot: string, private readonly opts: RuntimeOptions = {}) {
+  constructor(
+    private readonly workspaceRoot: string,
+    private readonly opts: RuntimeOptions = {},
+  ) {
     this.dir = join(workspaceRoot, '.zcode', 'marketing');
+    this.connections = new ConnectionStore(
+      join(this.dir, 'connections.json'),
+      this.opts.now ?? (() => new Date().toISOString()),
+    );
+    this.imports = new AssetImportSessions((missionId) =>
+      join(this.dir, 'missions', missionId, 'assets'),
+    );
   }
 
   /** Binds the host sampling channel; must be called before the first mission open. */
@@ -245,7 +327,7 @@ export class MarketingRuntime {
   }
 
   /** Connectors honestly available for the mission's platform + research mode. */
-  buildConnector(entry: MissionIndexEntry): MarketingConnector {
+  async buildConnector(entry: MissionIndexEntry): Promise<MarketingConnector> {
     const children: MarketingConnector[] = [];
     if (entry.brief.platform === 'youtube') {
       children.push(
@@ -260,6 +342,21 @@ export class MarketingRuntime {
           this.opts.transparencyFetchLike
             ? new GoogleAdsTransparencyConnector(this.opts.transparencyFetchLike)
             : new GoogleAdsTransparencyConnector(),
+        );
+      }
+      // W5: a connected publishing account (if any) joins the composite; its
+      // capabilities stay capability-declared (publishing+analytics only) and
+      // its environment label travels with every publication it creates.
+      const connection = await this.connections.find('youtube');
+      if (connection) {
+        // find() filters by platform, so the stored entry IS a youtube account;
+        // the literal re-typing below only satisfies the connector's narrower
+        // connection type.
+        const youtubeConnection: PublishingConnection = { ...connection, platform: 'youtube' };
+        children.push(
+          this.opts.publishFetchLike
+            ? new YoutubePublishConnector(youtubeConnection, this.opts.publishFetchLike)
+            : new YoutubePublishConnector(youtubeConnection),
         );
       }
     }
@@ -285,7 +382,7 @@ export class MarketingRuntime {
     if (!entry) {
       throw new Error(`unknown mission '${missionId}' — start it with marketing_mission_start`);
     }
-    const connector = this.buildConnector(entry);
+    const connector = await this.buildConnector(entry);
     await mkdir(join(this.dir, 'missions'), { recursive: true });
     const store = SqliteTemporalStore.open(join(this.dir, 'missions', `${missionId}.sqlite`), this.now);
     const mission = new MarketingMission(
@@ -307,7 +404,17 @@ export class MarketingRuntime {
       const raw = JSON.parse(await readFile(join(this.dir, 'missions', `${missionId}-artifacts.json`), 'utf8'));
       return missionArtifactsFile.parse(raw);
     } catch {
-      return { kind: 'marketing-mission-artifacts', version: 1, missionId, hypotheses: [], artifacts: [] };
+      return {
+        kind: 'marketing-mission-artifacts',
+        version: 1,
+        missionId,
+        hypotheses: [],
+        artifacts: [],
+        publications: [],
+        experiments: [],
+        simulations: [],
+        nextActions: [],
+      };
     }
   }
 
@@ -389,64 +496,174 @@ export class MarketingRuntime {
   }
 
   // -------------------------------------------------------------------------
+  // W5/W6 loop state — publications, experiments, simulations, next actions.
+  // Persisted in the per-mission artifacts file (restart-safe, defaults keep
+  // pre-W5 files parsing). The publish idempotency guarantee is enforced HERE:
+  // a persisted record with the same idempotency key is returned unchanged —
+  // a retry can never create a duplicate post.
+  // -------------------------------------------------------------------------
+  async savePublication(
+    missionId: string,
+    record: z.infer<typeof publicationRecord>,
+  ): Promise<void> {
+    const loaded = await this.open(missionId);
+    const next = loaded.artifacts.publications.filter((p) => p.id !== record.id);
+    next.push(record);
+    loaded.artifacts.publications = next;
+    await this.writeArtifacts(loaded);
+  }
+
+  async findPublicationByIdempotencyKey(
+    missionId: string,
+    idempotencyKey: string,
+  ): Promise<z.infer<typeof publicationRecord> | undefined> {
+    const loaded = await this.open(missionId);
+    return loaded.artifacts.publications.find((p) => p.idempotencyKey === idempotencyKey);
+  }
+
+  async getPublication(missionId: string, publicationId: string): Promise<z.infer<typeof publicationRecord>> {
+    const loaded = await this.open(missionId);
+    const publication = loaded.artifacts.publications.find((p) => p.id === publicationId);
+    if (!publication) {
+      throw new MarketingToolError(
+        'unknown_publication',
+        `mission '${missionId}' has no publication '${publicationId}' — publish with marketing_publish_asset (or record a manual publication) first`,
+      );
+    }
+    return publication;
+  }
+
+  async saveExperiment(missionId: string, record: z.infer<typeof experimentRecord>): Promise<void> {
+    const loaded = await this.open(missionId);
+    const next = loaded.artifacts.experiments.filter((e) => e.id !== record.id);
+    next.push(record);
+    loaded.artifacts.experiments = next;
+    await this.writeArtifacts(loaded);
+  }
+
+  async getExperiment(missionId: string, experimentId: string): Promise<z.infer<typeof experimentRecord>> {
+    const loaded = await this.open(missionId);
+    const experiment = loaded.artifacts.experiments.find((e) => e.id === experimentId);
+    if (!experiment) {
+      throw new MarketingToolError(
+        'unknown_experiment',
+        `mission '${missionId}' has no experiment '${experimentId}' — open one with marketing_open_experiment after a publication`,
+      );
+    }
+    return experiment;
+  }
+
+  async saveSimulation(missionId: string, record: z.infer<typeof simulationRun>): Promise<void> {
+    const loaded = await this.open(missionId);
+    // Calibration history is APPENDED: a re-evaluation for the same hypothesis
+    // extends the existing run instead of starting a parallel one.
+    const existing = loaded.artifacts.simulations.find(
+      (s) => s.hypothesisId === record.hypothesisId,
+    );
+    if (existing) {
+      existing.calibrationHistory = [...existing.calibrationHistory, ...record.calibrationHistory];
+    } else {
+      loaded.artifacts.simulations.push(record);
+    }
+    await this.writeArtifacts(loaded);
+  }
+
+  async saveNextAction(missionId: string, record: z.infer<typeof nextAction>): Promise<void> {
+    const loaded = await this.open(missionId);
+    const next = loaded.artifacts.nextActions.filter((a) => a.id !== record.id);
+    next.push(record);
+    loaded.artifacts.nextActions = next;
+    await this.writeArtifacts(loaded);
+  }
+
+  /**
+   * W5: connects a publishing account (validated through the connector's own
+   * healthCheck), then invalidates every loaded mission so the next open()
+   * rebuilds its connector WITH the publishing child — the composite is the
+   * single connector the mission's domain workflows talk to.
+   */
+  async connectAccount(input: ConnectAccountInput): Promise<ConnectionView> {
+    const view = await this.connections.connect(input, async (candidate) => {
+      const connector = new YoutubePublishConnector(
+        {
+          connectionId: 'candidate',
+          label: candidate.label,
+          platform: 'youtube',
+          dataBase: candidate.dataBase,
+          analyticsBase: candidate.analyticsBase,
+          accessToken: candidate.accessToken,
+          accountRef: candidate.accountRef,
+          environment: candidate.environment,
+        },
+        this.opts.publishFetchLike,
+      );
+      return connector.healthCheck();
+    });
+    await this.invalidateLoadedMissions();
+    return view;
+  }
+
+  /** Closes and drops every cached mission (SQLite handles closed first). */
+  private async invalidateLoadedMissions(): Promise<void> {
+    for (const m of this.loaded.values()) {
+      await (m.store as unknown as { close?: () => void }).close?.();
+    }
+    this.loaded.clear();
+  }
+
+  /**
+   * W5: resolves an uploaded asset's workspace-relative path to bytes for
+   * publishing. The path must stay inside the workspace (no traversal).
+   */
+  async readArtifactFile(
+    artifact: CreativeArtifact,
+  ): Promise<{ bytes: Uint8Array; name: string; path: string }> {
+    const file = (artifact.brief as { declaration?: { file?: { path: string; name: string } } })
+      .declaration?.file;
+    if (!file?.path) {
+      throw new MarketingToolError(
+        'invalid_input',
+        `artifact ${artifact.id} has no imported file — bring the produced asset back with marketing_asset_import_* + marketing_record_asset before publishing`,
+      );
+    }
+    const absolute = join(this.workspaceRoot, file.path);
+    const root = join(this.workspaceRoot, '.zcode');
+    if (!absolute.startsWith(root)) {
+      throw new MarketingToolError('invalid_input', 'asset path escapes the workspace — refused');
+    }
+    const buffer = await readFile(absolute);
+    return { bytes: new Uint8Array(buffer), name: file.name, path: file.path };
+  }
+
+  /** W5: keyless public verification of a manually published URL (oEmbed). */
+  async verifyPublicVideo(url: string): Promise<{
+    exists: boolean;
+    title?: string;
+    authorName?: string;
+    thumbnailUrl?: string;
+    detail: string;
+  }> {
+    const connector = this.opts.fetchLike
+      ? new YoutubePublicConnector(this.opts.fetchLike)
+      : new YoutubePublicConnector();
+    return connector.verifyPublicVideo(url);
+  }
+
+  // -------------------------------------------------------------------------
   // W4 chunked asset import (office begin/write/finish convention, app-only
-  // visibility): the panel streams the produced file into the mission
-  // workspace so the mission holds the actual asset, not just a declaration.
+  // visibility) — delegated to AssetImportSessions (see assetImport.ts).
   // -------------------------------------------------------------------------
   async beginAssetImport(input: { missionId: string; name: string; size: number }): Promise<{ id: string }> {
-    const loaded = await this.open(input.missionId);
-    void loaded;
-    const safe = input.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
-    if (safe.length === 0) throw new MarketingToolError('invalid_input', 'asset name is empty after sanitization');
-    if (input.size <= 0 || input.size > 512 * 1024 * 1024) {
-      throw new MarketingToolError('invalid_input', 'asset size must be between 1 byte and 512 MiB');
-    }
-    const id = `asset-${(this.importCounter += 1)}-${Date.now()}`;
-    const dir = join(this.dir, 'missions', input.missionId, 'assets');
-    await mkdir(dir, { recursive: true });
-    const path = join(dir, `${id}-${safe}`);
-    const handle = await open(path, 'wx');
-    this.imports.set(id, {
-      id,
-      missionId: input.missionId,
-      name: safe,
-      declaredBytes: input.size,
-      received: 0,
-      handle,
-      path,
-    });
-    return { id };
+    await this.open(input.missionId); // unknown mission -> typed error
+    return this.imports.begin(input);
   }
 
   async writeAssetChunk(id: string, offset: number, base64: string): Promise<void> {
-    const session = this.imports.get(id);
-    if (!session) throw new MarketingToolError('unknown_import', `no asset import in progress '${id}'`);
-    const chunk = Buffer.from(base64, 'base64');
-    if (chunk.byteLength === 0) throw new MarketingToolError('invalid_input', 'empty chunk');
-    await session.handle.write(chunk, offset);
-    session.received += chunk.byteLength;
+    await this.imports.writeChunk(id, offset, base64);
   }
 
   async finishAssetImport(id: string): Promise<{ name: string; bytes: number; path: string }> {
-    const session = this.imports.get(id);
-    if (!session) throw new MarketingToolError('unknown_import', `no asset import in progress '${id}'`);
-    if (session.received !== session.declaredBytes) {
-      await session.handle.close();
-      await unlink(session.path).catch(() => undefined);
-      this.imports.delete(id);
-      throw new MarketingToolError(
-        'invalid_input',
-        `import '${id}' declared ${session.declaredBytes} bytes but received ${session.received} — import aborted, retry from begin`,
-      );
-    }
-    await session.handle.close();
-    this.imports.delete(id);
-    return {
-      name: session.name,
-      bytes: session.received,
-      // Workspace-relative so it never leaks an absolute host path into records.
-      path: session.path.split('.zcode').pop()!.replace(/^\//, '.zcode/'),
-    };
+    return this.imports.finish(id);
   }
 
   /** Resolves a completed import's stored file by import id (record step). */
@@ -454,23 +671,7 @@ export class MarketingRuntime {
     missionId: string,
     importedAssetId: string,
   ): Promise<{ name: string; bytes: number; path: string }> {
-    const dir = join(this.dir, 'missions', missionId, 'assets');
-    const entries = await readdir(dir).catch(() => [] as string[]);
-    const match = entries.find((name) => name.startsWith(`${importedAssetId}-`));
-    if (!match) {
-      throw new MarketingToolError(
-        'unknown_import',
-        `no imported asset '${importedAssetId}' in mission '${missionId}' — complete a marketing_asset_import_begin/write/finish chain first`,
-      );
-    }
-    const absolute = join(dir, match);
-    const info = await stat(absolute);
-    return {
-      name: match.slice(importedAssetId.length + 1),
-      bytes: info.size,
-      // Workspace-relative so records never leak absolute host paths.
-      path: absolute.split('.zcode').pop()!.replace(/^\//, '.zcode/'),
-    };
+    return this.imports.resolve(missionId, importedAssetId);
   }
 
   async start(input: { missionId: string; brief: ProductBrief; researchMode: ResearchMode }): Promise<MissionIndexEntry> {
@@ -485,7 +686,7 @@ export class MarketingRuntime {
       createdAt: this.now(),
       competitors: [],
     });
-    this.buildConnector(entry); // fails fast on unsupported platform
+    await this.buildConnector(entry); // fails fast on unsupported platform
     index.missions.push(entry);
     await this.writeIndex(index);
     return entry;
@@ -537,25 +738,10 @@ export class MarketingRuntime {
   }
 
   async close(): Promise<void> {
-    for (const session of this.imports.values()) {
-      await session.handle.close().catch(() => undefined);
-      await unlink(session.path).catch(() => undefined);
-    }
-    this.imports.clear();
+    await this.imports.abortAll();
     for (const m of this.loaded.values()) {
       await (m.store as unknown as { close?: () => void }).close?.();
     }
     this.loaded.clear();
-  }
-}
-
-/** Typed tool failure — surfaced to the model as a structured error, never a crash. */
-export class MarketingToolError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'MarketingToolError';
   }
 }

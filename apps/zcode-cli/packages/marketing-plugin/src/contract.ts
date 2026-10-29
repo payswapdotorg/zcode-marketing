@@ -26,6 +26,8 @@ export const MARKETING_MISSION_DB = ".zcode/marketing/missions/<missionId>.sqlit
 export const MARKETING_MISSION_ARTIFACTS = ".zcode/marketing/missions/<missionId>-artifacts.json" as const;
 /** W4：面板导入的资产文件落点。 */
 export const MARKETING_MISSION_ASSETS = ".zcode/marketing/missions/<missionId>/assets/" as const;
+/** W5：已连接发布账号的凭证存储（access token 只落在这里，工具永不回显）。 */
+export const MARKETING_CONNECTIONS = ".zcode/marketing/connections.json" as const;
 
 /** 本波次注册的 MCP 工具（输入/输出 schema 见 src/server.ts；语义见 docs/marketing/）。 */
 export const MARKETING_TOOLS = [
@@ -46,6 +48,18 @@ export const MARKETING_TOOLS = [
   "marketing_asset_import_finish",
   "marketing_record_asset",
   "marketing_compare_assets",
+  // W5 — authorized publishing (organic only; NEVER paid campaign execution).
+  "marketing_connect_publish_account",
+  "marketing_list_connections",
+  "marketing_publish_asset",
+  "marketing_assisted_handoff",
+  "marketing_record_manual_publication",
+  "marketing_verify_publication",
+  "marketing_list_publications",
+  // W6 — measurement & closed-loop learning.
+  "marketing_open_experiment",
+  "marketing_collect_analytics",
+  "marketing_record_outcome",
 ] as const;
 
 export type MarketingTool = (typeof MARKETING_TOOLS)[number];
@@ -70,6 +84,27 @@ export const MARKETING_PANEL_TOOLS = [
   "marketing_review_artifact",
   "marketing_record_asset",
   "marketing_compare_assets",
+  // W5/W6 loop surfaces.
+  "marketing_connect_publish_account",
+  "marketing_list_connections",
+  "marketing_publish_asset",
+  "marketing_assisted_handoff",
+  "marketing_record_manual_publication",
+  "marketing_verify_publication",
+  "marketing_list_publications",
+  "marketing_open_experiment",
+  "marketing_collect_analytics",
+  "marketing_record_outcome",
+] as const;
+
+/** W5 发布工具集（闭合清单）：organic 发布，绝不隐含 paidAds 权限域。 */
+export const MARKETING_PUBLISHING_TOOLS = [
+  "marketing_connect_publish_account",
+  "marketing_list_connections",
+  "marketing_publish_asset",
+  "marketing_assisted_handoff",
+  "marketing_record_manual_publication",
+  "marketing_verify_publication",
 ] as const;
 
 export interface MarketingPluginContract {
@@ -79,7 +114,7 @@ export interface MarketingPluginContract {
   outputs: typeof MARKETING_PLUGIN_OUTPUTS;
   /** 技能文件路径，相对插件根目录。 */
   skill: typeof MARKETING_PLUGIN_SKILL;
-  /** 工具集。发布工具（publishing）属于 W5，不在此波次。 */
+  /** 工具集。W5 起包含 organic 发布工具（MARKETING_PUBLISHING_TOOLS 闭合子集，绝不隐含 paidAds）。 */
   tools: readonly MarketingTool[];
   /**
    * Mission 持久化位置（相对用户工作区根）。前置条件：进程对工作区有写权限；
@@ -91,6 +126,7 @@ export interface MarketingPluginContract {
     missionDb: typeof MARKETING_MISSION_DB;
     missionArtifacts: typeof MARKETING_MISSION_ARTIFACTS;
     missionAssets: typeof MARKETING_MISSION_ASSETS;
+    connections: typeof MARKETING_CONNECTIONS;
   };
   /**
    * 模型通道契约（W3-2）：结构化抽取只经宿主 MCP `sampling/createMessage`

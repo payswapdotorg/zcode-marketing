@@ -13,7 +13,6 @@ import type {
   ConnectorCapabilities,
   ConnectorMeta,
   MarketingConnector,
-  PublishOutcome,
   ResearchPage,
   ResearchRequest,
 } from '../app/ports.js';

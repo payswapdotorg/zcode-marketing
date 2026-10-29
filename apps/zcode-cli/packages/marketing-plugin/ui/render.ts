@@ -10,6 +10,7 @@
 import { OBJECTIVES, type MissionEntry } from "./types.ts";
 import { S, STATE_CLASS, esc, num, selectedBrief, selectedMission, setHtml } from "./state.ts";
 import { renderCreative, wireCreative } from "./creative.ts";
+import { renderLoop, wireLoop } from "./loop.ts";
 
 /** Actions the app module provides; wired into rendered controls. */
 export interface PanelActions {
@@ -19,7 +20,7 @@ export interface PanelActions {
   submitDiscover: (form: HTMLFormElement, confirmNames?: string[]) => Promise<void>;
   runResearch: () => void;
   selectMission: (missionId: string) => void;
-  selectTab: (tab: "report" | "evidence" | "creative") => void;
+  selectTab: (tab: "report" | "evidence" | "creative" | "loop") => void;
 }
 
 let actions: PanelActions;
@@ -119,8 +120,9 @@ function renderMission(): string {
       <button class="tab${S.tab === "report" ? " active" : ""}" data-tab="report">${esc(S.locale === "zh" ? "调研报告" : "Research report")}</button>
       <button class="tab${S.tab === "evidence" ? " active" : ""}" data-tab="evidence">${esc(S.strings.evidence)}</button>
       <button class="tab${S.tab === "creative" ? " active" : ""}" data-tab="creative">${esc(S.locale === "zh" ? "创意" : "Creative")}</button>
+      <button class="tab${S.tab === "loop" ? " active" : ""}" data-tab="loop">${esc(S.locale === "zh" ? "发布与测量" : "Publish & Measure")}</button>
     </div>
-    ${S.tab === "report" ? renderReport(entry) : S.tab === "evidence" ? renderEvidence() : renderCreative()}`;
+    ${S.tab === "report" ? renderReport(entry) : S.tab === "evidence" ? renderEvidence() : S.tab === "creative" ? renderCreative() : renderLoop()}`;
 }
 
 function renderReport(entry: MissionEntry): string {
@@ -325,9 +327,10 @@ function wire(): void {
   document.querySelectorAll<HTMLElement>("[data-tab]").forEach((el) => {
     const tab = el.dataset.tab;
     el.onclick = () =>
-      actions.selectTab(tab === "evidence" ? "evidence" : tab === "creative" ? "creative" : "report");
+      actions.selectTab(tab === "evidence" ? "evidence" : tab === "creative" ? "creative" : tab === "loop" ? "loop" : "report");
   });
   if (S.tab === "creative") wireCreative();
+  if (S.tab === "loop") wireLoop();
   const refreshBtn = document.getElementById("refresh-btn");
   if (refreshBtn) refreshBtn.onclick = () => void actions.refreshAll();
   const newBtn = document.getElementById("new-mission-btn");

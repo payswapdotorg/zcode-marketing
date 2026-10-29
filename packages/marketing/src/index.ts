@@ -36,8 +36,12 @@ export type {
   ModelCapability,
   ModelPort,
   ModelTask,
+  PublishAsset,
   PublishRequest,
   PublishOutcome,
+  PublicationVerification,
+  AnalyticsRequest,
+  AnalyticsPage,
   ResearchPage,
   ResearchRequest,
 } from './app/ports.js';
@@ -48,6 +52,8 @@ export { FallbackModelPort } from './adapters/fallbackModel.js';
 export { SqliteTemporalStore } from './adapters/sqliteStore.js';
 export { YoutubePublicConnector, channelCandidate } from './adapters/sources/youtubePublic.js';
 export type { FetchLike } from './adapters/sources/youtubePublic.js';
+export { YoutubePublishConnector } from './adapters/sources/youtubePublish.js';
+export type { PublishingConnection, PublishFetchLike } from './adapters/sources/youtubePublish.js';
 export {
   GoogleAdsTransparencyConnector,
   advertiserCandidate,

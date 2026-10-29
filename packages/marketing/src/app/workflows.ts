@@ -439,10 +439,22 @@ export class MarketingMission {
   }
 
   /**
-   * Publishing (W5 machinery): approval is explicit, retries are idempotent,
-   * and organic publishing never authorizes paid campaigns.
+   * Publishing (W5): approval is explicit, retries are idempotent,
+   * and organic publishing never authorizes paid campaigns. When the mission's
+   * connector declares publishing (a connected account), the asset bytes and
+   * platform metadata travel through the connector contract; the publication
+   * record inherits the connection's honesty labels (connectionId, environment).
    */
-  async publish(artifact: z.infer<typeof creativeArtifact>, approvedBy: string): Promise<z.infer<typeof publicationRecord>> {
+  async publish(
+    artifact: z.infer<typeof creativeArtifact>,
+    approvedBy: string,
+    opts: {
+      connectionId?: string;
+      environment?: 'production' | 'sandbox';
+      /** W5: asset bytes + platform metadata for a connected-account upload. */
+      asset?: import('./ports.js').PublishAsset;
+    } = {},
+  ): Promise<z.infer<typeof publicationRecord>> {
     if (artifact.status !== 'approved') {
       throw new Error(`asset ${artifact.id} is not approved (status=${artifact.status}); explicit approval required`);
     }
@@ -458,6 +470,8 @@ export class MarketingMission {
       publishedAt: this.now(),
       status: 'pending',
       assistedHandoff: this.connector.meta.capabilities.publishing !== true,
+      ...(opts.connectionId ? { connectionId: opts.connectionId } : {}),
+      environment: opts.environment ?? 'production',
     });
     if (this.connector.publish) {
       const outcome = await this.connector.publish({
@@ -465,6 +479,7 @@ export class MarketingMission {
         artifactId: artifact.id,
         idempotencyKey,
         approvedBy,
+        ...(opts.asset ? { asset: opts.asset } : {}),
       });
       record.externalPostId = outcome.externalPostId;
       record.url = outcome.url;
@@ -475,12 +490,19 @@ export class MarketingMission {
     return record;
   }
 
-  /** Measurement window opens with the experiment; forecast is preserved verbatim. */
+  /**
+   * Measurement window opens with the experiment; forecast is preserved
+   * verbatim. The changed variables and window come from the artifact's
+   * experiment spec (W4) when present — the experiment tests exactly what the
+   * pack declared it would test.
+   */
   openExperiment(
     hypothesis: z.infer<typeof creativeHypothesis>,
     artifact: z.infer<typeof creativeArtifact>,
     publication: z.infer<typeof publicationRecord>,
   ): z.infer<typeof experimentRecord> {
+    const spec = (artifact.brief as { experimentSpec?: { changedVariables?: string[]; windowDays?: number } })
+      .experimentSpec;
     return experimentRecord.parse({
       kind: 'ExperimentRecord',
       id: nextId('experiment'),
@@ -489,66 +511,123 @@ export class MarketingMission {
       artifactId: artifact.id,
       publicationId: publication.id,
       goalMetricKey: hypothesis.predictedOutcome.metricKey,
-      changedVariables: ['hook'],
-      measurementWindowDays: 14,
+      changedVariables: spec?.changedVariables?.length ? spec.changedVariables : ['hook'],
+      measurementWindowDays: typeof spec?.windowDays === 'number' && spec.windowDays > 0 ? spec.windowDays : 14,
       startedAt: this.now(),
     });
   }
 
   /**
-   * Closed-loop learning: compare recorded outcome vs the PRESERVED forecast,
-   * keep successful elements, change the weakest contradicted assumption, and
-   * recommend the next experiment grounded in recorded evidence (W6 machinery).
+   * Closed-loop learning (W6): compare recorded outcomes against the PRESERVED
+   * forecast, keep successful elements, change the weakest contradicted
+   * assumption, and recommend the next experiment grounded in recorded
+   * evidence. When the observed metric is a proxy for the goal metric (the
+   * permitted analytics route could not observe the objective metric itself),
+   * the comparison carries the [PROXY] label — the Stage C honesty discipline
+   * applied to experiments. Calibration history is appended, never overwritten.
    */
   async completeExperiment(
     experiment: z.infer<typeof experimentRecord>,
     observedValue: number,
+    opts: {
+      /** Metric actually observed (defaults to the goal metric key). */
+      observedMetricKey?: string;
+      /** The preserved forecast compared against (defaults: the goal metric's record). */
+      forecast?: { low: number; expected: number; high: number; metricKey: string };
+    } = {},
   ): Promise<{
     result: z.infer<typeof experimentRecord>;
     simulation: z.infer<typeof simulationRun>;
     action: z.infer<typeof nextAction>;
+    comparison: {
+      observedMetricKey: string;
+      isProxy: boolean;
+      withinForecastRange: boolean | null;
+      direction: 'above' | 'below' | 'within' | 'unknown';
+      forecastErrorRatio: number | null;
+      note: string;
+    };
   }> {
+    const observedMetricKey = opts.observedMetricKey ?? experiment.goalMetricKey;
+    const forecast =
+      opts.forecast ?? { low: 0, expected: observedValue || 1, high: Number.POSITIVE_INFINITY, metricKey: experiment.goalMetricKey };
+    const isProxy = observedMetricKey !== experiment.goalMetricKey;
+    const withinRange =
+      Number.isFinite(forecast.high) ? observedValue >= forecast.low && observedValue <= forecast.high : null;
+    const direction: 'above' | 'below' | 'within' | 'unknown' =
+      withinRange === null ? 'unknown' : observedValue > forecast.high ? 'above' : observedValue < forecast.low ? 'below' : 'within';
+    const forecastErrorRatio = forecast.expected !== 0 ? observedValue / forecast.expected : null;
+    const proxyNote = isProxy
+      ? `[PROXY] compared on '${observedMetricKey}' — the goal metric '${experiment.goalMetricKey}' is not observable through permitted analytics for this publication; `
+      : '';
+    const rangeNote =
+      withinRange === null
+        ? 'forecast range not comparable on this metric (open-ended forecast preserved verbatim)'
+        : `observed ${observedValue} vs preserved forecast [${forecast.low}..${forecast.high}] (expected ${forecast.expected}) — ${direction}`;
+    const note = proxyNote + rangeNote;
+
+    const supported: string[] = [];
+    const contradicted: string[] = [];
+    if (direction === 'within' || direction === 'above') {
+      supported.push(`${observedMetricKey} met or exceeded the preserved forecast (${observedValue} vs expected ${forecast.expected})`);
+      supported.push('format held attention across the measurement window');
+    } else if (direction === 'below') {
+      contradicted.push(`${observedMetricKey} landed below the preserved forecast range (${observedValue} vs low ${forecast.low})`);
+      contradicted.push('hook underperformed forecast — the opening assumption is the weakest link');
+    } else {
+      supported.push(`${observedMetricKey} observed at ${observedValue}; forecast comparison unavailable on this metric`);
+    }
+    if (isProxy) {
+      contradicted.push(`goal metric '${experiment.goalMetricKey}' remained unobservable — proxy conclusion only, never reported as the objective metric`);
+    }
+
     const result = experimentRecord.parse({
       ...experiment,
       result: {
         forecastPreserved: true,
-        observedMetricKey: experiment.goalMetricKey,
+        observedMetricKey,
         observedValue,
-        supported: observedValue >= 0 ? ['format held attention across window'] : [],
-        contradicted: observedValue < 0 ? ['hook underperformed forecast'] : [],
+        supported,
+        contradicted,
         completedAt: this.now(),
       },
     });
-    const forecastError = observedValue - 1; // calibration hook: refined per W6 with real outcomes
+    const calibrationNote =
+      forecastErrorRatio !== null
+        ? `multiplicative correction ${forecastErrorRatio.toFixed(2)}x on '${observedMetricKey}'; apply to the next forecast for this audience/format${isProxy ? ' (proxy-calibrated)' : ''}`
+        : `forecast expectation was zero — next forecast must establish a non-zero baseline on '${observedMetricKey}'`;
     const simulation = simulationRun.parse({
       kind: 'SimulationRun',
       id: nextId('simulation'),
       missionId: this.brief.missionId,
       hypothesisId: experiment.hypothesisId,
-      assumptions: ['format transfers from competitor context to this product'],
-      modelRef: 'calibration:v0',
-      projectedRange: { low: 0.8, expected: 1, high: 1.2 },
-      calibrationHistory: [{ evaluatedAt: this.now(), forecastError, note: 'initial calibration entry' }],
+      assumptions: [
+        'format transfers from competitor context to this product',
+        ...(isProxy ? ['proxy metric tracks the objective metric directionally'] : []),
+      ],
+      modelRef: 'calibration:v1',
+      projectedRange: { low: forecast.low, expected: forecast.expected, high: forecast.high },
+      calibrationHistory: [{ evaluatedAt: this.now(), forecastError: forecastErrorRatio ?? 0, note: calibrationNote }],
     });
     const action = nextAction.parse({
       kind: 'NextAction',
       id: nextId('next-action'),
       missionId: this.brief.missionId,
       experimentId: experiment.id,
-      keep: result.result?.supported ?? [],
-      // Keep the successful elements; when nothing was contradicted, the next
-      // experiment still deliberately changes one variable (no blind repeats).
+      keep: supported.length > 0 ? supported : ['measurement completed — no assumption was supported or contradicted decisively'],
       change:
-        (result.result?.contradicted?.length ?? 0) > 0
-          ? result.result!.contradicted
-          : ['hook: no assumption contradicted — next experiment changes the opening hook variant'],
+        contradicted.length > 0
+          ? contradicted
+          : experiment.changedVariables.map((v) => `${v}: no assumption contradicted — next experiment deliberately changes this variable (no blind repeats)`),
       recommendation:
-        observedValue >= 0
-          ? 'keep the winning elements; test a new hook against the same audience next iteration'
-          : 'change the weakest supported assumption: rework the opening hook before scaling spend',
-      evidence: [evRef(`experiment:${experiment.id}`, 'recorded outcome vs preserved forecast', this.now())],
+        direction === 'below'
+          ? `observed ${observedValue} on ${observedMetricKey} fell below the preserved forecast [${forecast.low}..${forecast.high}]: keep the format elements that held, rework the ${experiment.changedVariables[0]} variant before scaling, and re-forecast with the ${forecastErrorRatio !== null ? `${forecastErrorRatio.toFixed(2)}x ` : ''}calibration correction`
+          : direction === 'above'
+            ? `observed ${observedValue} on ${observedMetricKey} beat the preserved forecast (expected ${forecast.expected}): keep the winning elements, scale this pattern, and test the next ${experiment.changedVariables[0]} variant against it`
+            : `observed ${observedValue} on ${observedMetricKey} landed ${direction === 'within' ? 'within' : 'against'} the preserved forecast [${forecast.low}..${forecast.high}]: keep the supported elements and deliberately change ${experiment.changedVariables[0]} in the next experiment${isProxy ? ' — proxy-labeled conclusion only' : ''}`,
+      evidence: [evRef(`experiment:${experiment.id}`, `recorded outcome ${observedValue} on ${observedMetricKey} vs preserved forecast`, this.now())],
     });
-    return { result, simulation, action };
+    return { result, simulation, action, comparison: { observedMetricKey, isProxy, withinForecastRange: withinRange, direction, forecastErrorRatio, note } };
   }
 
   buildMarketMap(competitors: CompetitorCandidate[]): z.infer<typeof marketMap> {

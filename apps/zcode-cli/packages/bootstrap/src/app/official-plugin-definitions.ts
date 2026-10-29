@@ -259,7 +259,7 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
       displayName: "Marketing Intelligence",
       displayName_i18n: { "zh-CN": "营销情报" },
       description_i18n: {
-        "zh-CN": "证据支撑的营销情报任务：竞品调研、创意结构分析与显式标注数据空缺的机会排序，含营销工作台面板。",
+        "zh-CN": "证据支撑的营销情报任务：竞品调研、创意分析、机会排序，创意交接、经授权（测试）账号或辅助路径的发布、以及结果测量与闭环学习，含营销工作台面板。",
       },
     },
     name: "marketing",
@@ -271,7 +271,7 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
       "../../marketing-plugin",
       "../../../marketing-plugin",
     ],
-    version: "0.3.0",
+    version: "0.4.0",
   },
   {
     // 沿用原聚合文档插件的官方搜图能力，仅拆出独立开关；认证仍由官方 MCP adapter 注入。

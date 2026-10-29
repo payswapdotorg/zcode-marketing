@@ -25,7 +25,7 @@ export function exampleMarketingPlugin(
   };
 }
 
-/** 契约快照：本波次工具集（publishing 属 W5，不在此列）。 */
+/** 契约快照：本波次工具集（W5 起 publishing 进入，闭合于 MARKETING_PUBLISHING_TOOLS，绝不隐含 paidAds）。 */
 export function exampleToolRoster(): readonly string[] {
   return MARKETING_TOOLS;
 }

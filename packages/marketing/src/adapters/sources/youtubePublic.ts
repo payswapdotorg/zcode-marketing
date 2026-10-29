@@ -245,6 +245,36 @@ export class YoutubePublicConnector implements MarketingConnector {
   // publish()/analytics() intentionally do NOT exist: capabilities declare
   // research only (contract: publish() exists iff capabilities.publishing).
 
+  /**
+   * W5: verify a publicly accessible video URL through the permitted keyless
+   * oEmbed route — post-status verification for manually published posts.
+   * Honest outcomes only: an unresolvable URL is reported as not verified,
+   * never as a failure of the platform.
+   */
+  async verifyPublicVideo(videoUrl: string): Promise<{
+    exists: boolean;
+    title?: string;
+    authorName?: string;
+    thumbnailUrl?: string;
+    detail: string;
+  }> {
+    try {
+      const json = await this.oembed(videoUrl);
+      return {
+        exists: typeof json.title === 'string' && (json.title as string).length > 0,
+        ...(typeof json.title === 'string' ? { title: json.title as string } : {}),
+        ...(typeof json.author_name === 'string' ? { authorName: json.author_name as string } : {}),
+        ...(typeof json.thumbnail_url === 'string' ? { thumbnailUrl: json.thumbnail_url as string } : {}),
+        detail: `oEmbed resolved the URL through the keyless public route`,
+      };
+    } catch (err) {
+      if (err instanceof ConnectorFailure && err.error.kind === 'coverage_gap') {
+        return { exists: false, detail: `not verifiable through the keyless public route: ${err.error.detail}` };
+      }
+      throw err;
+    }
+  }
+
   private async resolveChannelId(input: string): Promise<string> {
     const trimmed = input.trim();
     if (CHANNEL_ID_RE.test(trimmed)) return trimmed;
