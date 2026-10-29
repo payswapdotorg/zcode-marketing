@@ -62,6 +62,11 @@ const defaultFetch: PublishFetchLike = async (url, init) => {
   return { status: res.status, headers, body: await res.text() };
 };
 
+/** W7-2 reliability bounds: bounded retries with linear backoff, never unbounded. */
+const MAX_UPLOAD_ATTEMPTS = 3;
+const MAX_GET_ATTEMPTS = 3;
+const BACKOFF_BASE_MS = 250;
+
 /** A connected publishing account — what the connection store persists. */
 export interface PublishingConnection {
   connectionId: string;
@@ -142,28 +147,32 @@ export class YoutubePublishConnector implements MarketingConnector {
     }
     const { asset } = request;
 
-    // Step 1 — resumable session initiation with the video metadata.
+    // Step 1 — resumable session initiation with the video metadata. The
+    // idempotency key makes a bounded transient retry safe here.
     const initUrl = `${this.connection.dataBase}/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status`;
-    const init = await this.fetchLike(initUrl, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${this.connection.accessToken}`,
-        'content-type': 'application/json',
-        // Connector-level idempotency hint; the caller's persisted
-        // PublicationRecord is the durable guarantee for cross-process retries.
-        'x-idempotency-key': request.idempotencyKey,
-      },
-      body: JSON.stringify({
-        snippet: {
-          title: asset.title,
-          description: asset.description,
-          tags: asset.tags,
-          categoryId: '22', // People & Blogs (safe default for organic brand content)
+    const init = await this.withTransientRetry(async () => {
+      const res = await this.fetchLike(initUrl, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${this.connection.accessToken}`,
+          'content-type': 'application/json',
+          // Connector-level idempotency hint; the caller's persisted
+          // PublicationRecord is the durable guarantee for cross-process retries.
+          'x-idempotency-key': request.idempotencyKey,
         },
-        status: { privacyStatus: asset.privacyStatus, selfDeclaredMadeForKids: false },
-      }),
+        body: JSON.stringify({
+          snippet: {
+            title: asset.title,
+            description: asset.description,
+            tags: asset.tags,
+            categoryId: '22', // People & Blogs (safe default for organic brand content)
+          },
+          status: { privacyStatus: asset.privacyStatus, selfDeclaredMadeForKids: false },
+        }),
+      });
+      this.assertOk(res.status, 'upload session initiation');
+      return res;
     });
-    this.assertOk(init.status, 'upload session initiation');
     const sessionUrl = init.headers['location'];
     if (!sessionUrl) {
       throw new ConnectorFailure({
@@ -173,16 +182,55 @@ export class YoutubePublishConnector implements MarketingConnector {
       });
     }
 
-    // Step 2 — upload the bytes to the session URL.
-    const upload = await this.fetchLike(sessionUrl, {
-      method: 'PUT',
-      headers: {
-        ...(asset.mimeType ? { 'content-type': asset.mimeType } : {}),
-        'content-length': String(asset.bytes.byteLength),
-      },
-      body: asset.bytes,
-    });
-    this.assertOk(upload.status, 'video upload');
+    // Step 2 — upload the bytes to the session URL with the REAL resumable
+    // protocol's durability semantics (W7-2 hardening):
+    //   - a 308 with a Range header means a PARTIAL commit — resume from the
+    //     durable offset, never re-send committed bytes;
+    //   - a 5xx/network failure is retried a bounded number of times: the
+    //     session is first queried for its committed offset (an empty PUT
+    //     whose Content-Range header is the total-only probe form), then the
+    //     remainder is sent with a proper `Content-Range` header;
+    //   - 429 (quota) surfaces immediately as the typed rate_limit — the retry
+    //     hint travels to the caller; the connector never sleeps past a tool
+    //     budget guessing at the platform's quota window.
+    const total = asset.bytes.byteLength;
+    let offset = 0;
+    let upload: Awaited<ReturnType<PublishFetchLike>> | undefined;
+    for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt += 1) {
+      try {
+        const headers: Record<string, string> = {
+          ...(asset.mimeType ? { 'content-type': asset.mimeType } : {}),
+          ...(offset > 0
+            ? { 'content-range': `bytes ${offset}-${total - 1}/${total}` }
+            : { 'content-length': String(total) }),
+        };
+        upload = await this.fetchLike(sessionUrl, {
+          method: 'PUT',
+          headers,
+          ...(offset > 0 ? { body: asset.bytes.subarray(offset) } : { body: asset.bytes }),
+        });
+        if (upload.status === 200 || upload.status === 201) break;
+        if (upload.status === 308) {
+          // Partial commit — the session reports what is durable; resume.
+          const matched = /bytes=0-(\d+)/.exec(upload.headers['range'] ?? '')?.[1];
+          offset = matched !== undefined ? Number(matched) + 1 : 0;
+          continue;
+        }
+        this.assertOk(upload.status, 'video upload');
+      } catch (err) {
+        const retryable = err instanceof ConnectorFailure && err.error.kind === 'transient_network';
+        if (!retryable || attempt === MAX_UPLOAD_ATTEMPTS) throw err;
+        offset = await this.querySessionOffset(sessionUrl, total);
+        await this.sleep(BACKOFF_BASE_MS * attempt);
+      }
+    }
+    if (!upload || (upload.status !== 200 && upload.status !== 201)) {
+      throw new ConnectorFailure({
+        kind: 'transient_network',
+        retryable: false,
+        attempt: MAX_UPLOAD_ATTEMPTS,
+      });
+    }
     let video: { id?: string; status?: { uploadStatus?: string; privacyStatus?: string } };
     try {
       video = JSON.parse(upload.body) as typeof video;
@@ -314,12 +362,77 @@ export class YoutubePublishConnector implements MarketingConnector {
     return { observations, coverage, accessMethod: 'authorizedAccount' };
   }
 
+  /**
+   * W7-2: GET routes retry bounded on transient failures (5xx / transport
+   * errors) with linear backoff; quota (429) and auth failures surface
+   * immediately through their typed errors — never silently retried.
+   */
   private async get(url: string): Promise<{ status: number; body: string }> {
-    const res = await this.fetchLike(url, {
-      method: 'GET',
-      headers: { authorization: `Bearer ${this.connection.accessToken}` },
-    });
-    return { status: res.status, body: res.body };
+    let lastError: ConnectorFailure | undefined;
+    for (let attempt = 1; attempt <= MAX_GET_ATTEMPTS; attempt += 1) {
+      let res: Awaited<ReturnType<PublishFetchLike>>;
+      try {
+        res = await this.fetchLike(url, {
+          method: 'GET',
+          headers: { authorization: `Bearer ${this.connection.accessToken}` },
+        });
+      } catch {
+        lastError = new ConnectorFailure({ kind: 'transient_network', retryable: true, attempt });
+        if (attempt === MAX_GET_ATTEMPTS) throw lastError;
+        await this.sleep(BACKOFF_BASE_MS * attempt);
+        continue;
+      }
+      if (res.status >= 500 && attempt < MAX_GET_ATTEMPTS) {
+        await this.sleep(BACKOFF_BASE_MS * attempt);
+        continue;
+      }
+      return { status: res.status, body: res.body };
+    }
+    throw (
+      lastError ??
+      new ConnectorFailure({ kind: 'transient_network', retryable: false, attempt: MAX_GET_ATTEMPTS })
+    );
+  }
+
+  /**
+   * W7-2: asks the resumable session what is durable (the real protocol's
+   * status query: an empty PUT whose Content-Range header carries the
+   * total-only probe form; the 308 Range reply carries the committed prefix).
+   * Best-effort: an unanswerable session restarts the bytes from zero — the
+   * bounded attempt counter is the guard, never an unbounded loop.
+   */
+  private async querySessionOffset(sessionUrl: string, total: number): Promise<number> {
+    try {
+      const probe = await this.fetchLike(sessionUrl, {
+        method: 'PUT',
+        headers: { 'content-length': '0', 'content-range': `bytes */${total}` },
+        body: '',
+      });
+      const matched = /bytes=0-(\d+)/.exec(probe.headers['range'] ?? '')?.[1];
+      return matched !== undefined ? Number(matched) + 1 : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /** Bounded retry wrapper for transient failures on idempotent requests. */
+  private async withTransientRetry<T>(run: () => Promise<T>): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= MAX_GET_ATTEMPTS; attempt += 1) {
+      try {
+        return await run();
+      } catch (err) {
+        lastError = err;
+        if (!(err instanceof ConnectorFailure && err.error.kind === 'transient_network')) throw err;
+        if (attempt === MAX_GET_ATTEMPTS) throw err;
+        await this.sleep(BACKOFF_BASE_MS * attempt);
+      }
+    }
+    throw lastError;
   }
 
   /** Maps platform HTTP statuses to the typed error contract (never stringly failures). */

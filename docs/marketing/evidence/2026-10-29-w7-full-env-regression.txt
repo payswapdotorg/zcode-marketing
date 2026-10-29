@@ -1,0 +1,52 @@
+================================================================================
+W7-1 — Full-environment regression gate: the complete workflow passes
+Date: 2026-10-29 (UTC)  ·  environment: this sandbox (3-core, ~3 GB RAM) + corepack pnpm 10.33.2 (the repo pin)
+Reproduce: corepack pnpm run typecheck / test:unit / verify:pre-push from the repo root; corepack pnpm exec turbo run build --concurrency=2 && corepack pnpm vitest run tests/plugins.test.ts from apps/zcode-cli/packages/bootstrap.
+================================================================================
+This run closes the standing "full-environment verification" follow-up that had
+been pending since the earlier waves (the sandbox previously lacked pnpm; it
+is provided via corepack at the repo-pinned version, with NODE_OPTIONS
+--max-old-space-size raised for the 2 GB default heap cap on this box).
+
+GATES (this run):
+- Root `pnpm typecheck` — the FULL chain: tsc -b over shared/testing, marketing,
+  rpc, provider, provider-node, shared, services, client, server,
+  zcode-server-cli, ui, web, dev-docs, e2e-report, desktop main/host/e2e
+  (+ remote-main + zcode-cua --noEmit): PASS (needs --max-old-space-size=2560
+  on this 3 GB box; upstream dev machines don't hit the default 2 GB cap).
+- Root lint (`pnpm run lint`): 0 errors (96 pre-existing warnings across the
+  6718-file upstream tree — same class as the 2026-10-28 record).
+- db:schema:check: PASS (node --test 8/8).
+- test:architecture: PASS 36/36.
+- architecture:check --changed: 0 violations (baseline 0, new 0).
+- COMPLETE root unit suite (all projects, chunked for the box: services /
+  desktop / rest / ui x3 shards / fork-isolated / cua-placeholder):
+  19,854 tests PASSED, 21 skipped, 1 failure — the mise toolchain PATH test
+  (packages/desktop/test/miseToolchainEnv.test.ts), which assumes the launcher
+  Node directory differs from /usr/bin; on this box node IS /usr/bin/node, so
+  the dedup expectation collapses. Environment-induced, pre-existing, unrelated
+  to the marketing module — recorded here instead of patched (patching an
+  upstream test to green a suite would be dishonest; it passes on standard
+  dev/CI node layouts).
+- zcode-cli workspace build (turbo run build, concurrency 2): 25/25 packages.
+- Bootstrap plugin-registry tests: 47/47 PASS — this run CAUGHT and FIXED a
+  real version misalignment (the plugin manifest .zcode-plugin/plugin.json was
+  still 0.3.0 after package.json/definition moved to 0.4.0; aligned in the
+  same wave). This is the gate doing its job.
+- Adapters plugins tests: 79/79 PASS.
+- Marketing slice (re-run same wave): plugin vitest 53/53, domain vitest 19/19,
+  demo:loop + demo:sqlite all gates, demo:w5 (37 gates) + demo:w6 (34 gates)
+  all gates, panel browser E2E 17/17 gates (real Chromium, desktop sandbox
+  CSP), marketing + plugin typecheck clean.
+- Push gates: the real husky pre-push hook ran end to end on the W5/W6 push
+  (lint -> db:schema:check -> test:architecture -> architecture:check
+  --changed -> affected-UT selector); the affected-UT selector chose the
+  entire root suite by design and skipped execution per its own policy (the
+  full suite is executed and recorded above).
+
+CONCLUSION: the complete workflow passes security, regression, and integration
+suites in this environment, with the single environment-induced desktop PATH
+failure recorded honestly above. Remaining for the W7 exit gate: the product
+acceptance pass (the panel E2E is the recorded product surface) and the
+reliability/isolation hardening slices.
+================================================================================

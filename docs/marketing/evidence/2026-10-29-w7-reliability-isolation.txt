@@ -1,0 +1,75 @@
+================================================================================
+W7-2 + W7-3 — connector reliability hardening + tenant isolation
+Date: 2026-10-29 (UTC)  ·  all gates passed
+Reproduce: npx vitest run --project unit packages/marketing/test/ (25/25);
+  npx vitest run in apps/zcode-cli/packages/marketing-plugin (56/56, incl.
+  the W7-3 isolation suite); demo:w5 (37 gates) + demo:w6 (34 gates) re-run
+  green after the hardening; architecture:check --changed 0 violations.
+================================================================================
+W7-2 RELIABILITY (packages/marketing/src/adapters/sources/youtubePublish.ts):
+- The byte upload now speaks the REAL resumable protocol's durability
+  semantics: a 308 with a Range header is a partial commit — the connector
+  resumes from the session's durable offset and NEVER re-sends committed
+  bytes (the interrupted-upload test asserts the resume PUT carries exactly
+  `bytes 4-7/8` and a 4-byte body after a 4-byte durable prefix).
+- Transient failures (5xx / transport errors) retry a BOUNDED number of times
+  (3 attempts, 250ms linear backoff) on the idempotent session init and on
+  every GET route (videos.list verification, analytics reports); persistent
+  transients surface as the typed transient_network after exactly the
+  bounded attempts — never an unbounded loop, never a silent success.
+- Quota (429) surfaces immediately as the typed rate_limited with the quota
+  scope and retry hint: the connector never sleeps across a quota window
+  guessing at the platform's reset time (the host's retry policy and the
+  caller decide; the W3-3 evidence shows the host already retries
+  honorably).
+
+W7-3 TENANT ISOLATION (plugin test/w7-isolation.test.ts):
+- Missions are isolated tenants: every cross-mission id is a typed refusal
+  (unknown_artifact / unknown_publication / unknown_experiment /
+  unknown_import) across review/publish/verify/measure/outcome tools — no
+  accidental cross-tenant reads; import ids resolve only inside their own
+  mission's asset directory; loop state lists only the calling mission's
+  records.
+- Persistence: per-mission artifacts files only; no persisted record carries
+  an absolute host path (paths stay .zcode-relative).
+- The connection store's contract is stated and asserted explicitly: ONE
+  workspace-global publishing account per platform (the user's own account),
+  shared across their missions, token confined to the credential area.
+================================================================================
+
+DOMAIN SUITE (verbose, relevant sections)
+ ✓ |unit| packages/marketing/test/rubric.test.ts > asset validation rubric (W4) > passes every machine aspect on a clean declaration 3ms
+ ✓ |unit| packages/marketing/test/rubric.test.ts > asset validation rubric (W4) > fails the missing opening, proof, and CTA 1ms
+ ✓ |unit| packages/marketing/test/rubric.test.ts > asset validation rubric (W4) > warns when the CTA does not match the objective 1ms
+ ✓ |unit| packages/marketing/test/rubric.test.ts > asset validation rubric (W4) > fails shorts-format duration overflow and warns on aspect mismatch 1ms
+ ✓ |unit| packages/marketing/test/rubric.test.ts > asset validation rubric (W4) > flags superlatives without substantiation and competitor trademarks 0ms
+ ✓ |unit| packages/marketing/test/rubric.test.ts > asset validation rubric (W4) > fails discount language against a discount-constraining brief 0ms
+ ✓ |unit| packages/marketing/test/rubric.test.ts > asset validation rubric (W4) > warns when no file was imported (declaration only) 0ms
+ ✓ |unit| packages/marketing/test/rubric.test.ts > asset validation rubric (W4) > aggregates score and verdict deterministically 2ms
+ ✓ |unit| packages/marketing/test/rubric.test.ts > asset validation rubric (W4) > builds the versioned report with qualitative provenance 1ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector (W5) > publishes through the resumable-upload protocol and returns the post identity 8ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector (W5) > retries with the same idempotency key never create a duplicate post 0ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector (W5) > declares publishing+analytics only, and research is a typed refusal 2ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector (W5) > maps auth failures to the typed error and never leaks the token 2ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector (W5) > verifies the resulting post through the connected account (videos.list) 1ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector (W5) > collects permitted analytics as daily observations with provenance and honest coverage 1ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector reliability (W7-2) > retries the idempotent session init on a transient 5xx and completes the publish 251ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector reliability (W7-2) > resumes an interrupted upload from the session durable offset — committed bytes are never resent 251ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector reliability (W7-2) > retries transient 5xx on videos.list and verifies after recovery 752ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector reliability (W7-2) > retries transient 5xx on the analytics report and collects after recovery 251ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector reliability (W7-2) > surfaces persistent transients as the typed error after the bounded attempts (never an unbounded loop) 752ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > youtube publish connector reliability (W7-2) > surfaces quota (429) immediately with the quota scope — no silent retry across the quota window 1ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > closed-loop comparison engine (W6) > compares an in-range outcome on the goal metric and records the calibration correction 4ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > closed-loop comparison engine (W6) > labels a below-range outcome, contradicts the hook, and recommends the rework before scaling 0ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > closed-loop comparison engine (W6) > carries the [PROXY] label when the goal metric is unobservable and a proxy is compared 0ms
+ ✓ |unit| packages/marketing/test/publish.test.ts > closed-loop comparison engine (W6) > keeps the experiment window and changed variables from the artifact spec 0ms
+ Test Files  2 passed (2)
+      Tests  25 passed (25)
+
+PLUGIN SUITE (verbose, relevant sections)
+ ✓ test/w7-isolation.test.ts > W7-3 tenant isolation — missions are isolated tenants > refuses every cross-mission id with a typed error (no accidental tenant reads) 74ms
+ ✓ test/w7-isolation.test.ts > W7-3 tenant isolation — missions are isolated tenants > keeps missions in separate artifacts files and never persists absolute host paths 35ms
+ ✓ test/w7-isolation.test.ts > W7-3 tenant isolation — missions are isolated tenants > states the connection-store contract explicitly: one workspace-global publishing account per platform, shared across the user missions 1ms
+ ✓ test/sampling-model.test.ts > McpSamplingModel > declares per-task host-routed capabilities covering all model tasks with reliability above catalog bars 3ms
+ Test Files  10 passed (10)
+      Tests  56 passed (56)

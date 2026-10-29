@@ -1,10 +1,10 @@
 {
   "name": "marketing",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Built-in marketing intelligence plugin: evidence-backed competitor research, creative analysis, and opportunity ranking through the marketing mission tools.",
   "description_i18n": {
     "en": "Evidence-backed marketing intelligence missions: describe a product, research a platform's competitors, and get explicit-gap coverage reports with explainable creative opportunities. Includes the marketing workspace panel.",
-    "zh-CN": "证据支撑的营销情报任务：描述产品、调研平台竞品，获得显式标注数据空缺的覆盖报告与可解释的创意机会。"
+    "zh-CN": "证据支撑的营销情报任务：描述产品、调研平台竞品，获得显式标注数据空缺的覆盖报告与可解释的创意机会；创意交接、经授权（测试）账号或辅助路径的发布、结果测量与闭环学习。"
   },
   "author": {
     "name": "Z.ai"

@@ -40,14 +40,24 @@ const connection: PublishingConnection = {
   environment: 'sandbox',
 };
 
-/** Stateful wire fixture speaking the real protocol shapes. */
-function wireFixture(opts: { failInitWith?: number } = {}): {
+/**
+ * Stateful wire fixture speaking the real protocol shapes. W7-2 modes:
+ *  - initFlaky5xx: the first N session-init POSTs fail 503 (idempotent retry);
+ *  - uploadFlaky5xx/partialCommit: the first N byte PUTs fail 503 after
+ *    committing a durable prefix — the connector must query the session
+ *    (the total-only Content-Range probe answered 308 with a Range header)
+ *    and resume, never resend committed bytes;
+ *  - getFlaky5xx: the first N GETs (videos.list / analytics report) fail 503.
+ */
+function wireFixture(
+  opts: { failInitWith?: number; initFlaky5xx?: number; uploadFlaky5xx?: number; partialCommit?: number; getFlaky5xx?: number } = {},
+): {
   fetchLike: PublishFetchLike;
-  calls: Array<{ method: string; url: string; auth?: string; idem?: string }>;
+  calls: Array<{ method: string; url: string; auth?: string; idem?: string; range?: string; bodyBytes?: number }>;
   uploads: number;
 } {
-  const calls: Array<{ method: string; url: string; auth?: string; idem?: string }> = [];
-  const state = { uploads: 0, videos: 0 };
+  const calls: Array<{ method: string; url: string; auth?: string; idem?: string; range?: string; bodyBytes?: number }> = [];
+  const state = { uploads: 0, videos: 0, initFlakes: 0, uploadFlakes: 0, getFlakes: 0, committed: 0 };
   const fetchLike: PublishFetchLike = async (url, init) => {
     const method = init?.method ?? 'GET';
     calls.push({
@@ -55,11 +65,17 @@ function wireFixture(opts: { failInitWith?: number } = {}): {
       url,
       ...(init?.headers?.authorization ? { auth: init.headers.authorization } : {}),
       ...(init?.headers?.['x-idempotency-key'] ? { idem: init.headers['x-idempotency-key'] } : {}),
+      ...(init?.headers?.['content-range'] ? { range: init.headers['content-range'] } : {}),
+      ...(init?.body ? { bodyBytes: init.body.byteLength } : {}),
     });
     if (opts.failInitWith && method === 'POST') {
       return { status: opts.failInitWith, headers: {}, body: '' };
     }
     if (method === 'POST' && url.includes('/upload/youtube/v3/videos')) {
+      if (opts.initFlaky5xx && state.initFlakes < opts.initFlaky5xx) {
+        state.initFlakes += 1;
+        return { status: 503, headers: {}, body: '' };
+      }
       state.videos += 1;
       return {
         status: 200,
@@ -68,6 +84,16 @@ function wireFixture(opts: { failInitWith?: number } = {}): {
       };
     }
     if (method === 'PUT' && url.includes('/upload/resumable/')) {
+      // The real protocol's session status query: `Content-Range: bytes */<total>`, no bytes.
+      if (init?.headers?.['content-range']?.startsWith('bytes */')) {
+        return { status: 308, headers: { range: `bytes=0-${state.committed - 1}` }, body: '' };
+      }
+      // Interrupted upload: a durable prefix commits, the PUT then fails 503.
+      if (opts.uploadFlaky5xx && state.uploadFlakes < opts.uploadFlaky5xx) {
+        state.uploadFlakes += 1;
+        state.committed = opts.partialCommit ?? 0;
+        return { status: 503, headers: {}, body: '' };
+      }
       state.uploads += 1;
       const id = `sbvid${String(state.uploads).padStart(3, '0')}`;
       return {
@@ -81,6 +107,10 @@ function wireFixture(opts: { failInitWith?: number } = {}): {
       };
     }
     if (method === 'GET' && url.includes('/youtube/v3/videos')) {
+      if (opts.getFlaky5xx && state.getFlakes < opts.getFlaky5xx) {
+        state.getFlakes += 1;
+        return { status: 503, headers: {}, body: '' };
+      }
       return {
         status: 200,
         headers: {},
@@ -96,6 +126,10 @@ function wireFixture(opts: { failInitWith?: number } = {}): {
       };
     }
     if (method === 'GET' && url.includes('/v2/reports')) {
+      if (opts.getFlaky5xx && state.getFlakes < opts.getFlaky5xx) {
+        state.getFlakes += 1;
+        return { status: 503, headers: {}, body: '' };
+      }
       return {
         status: 200,
         headers: {},
@@ -220,6 +254,79 @@ describe('youtube publish connector (W5)', () => {
     expect(page.coverage[0]?.state).toBe('available');
     // The sandbox label travels with the coverage note — never presented as production.
     expect(page.coverage[0]?.note).toContain('sandbox environment');
+  });
+});
+
+describe('youtube publish connector reliability (W7-2)', () => {
+  const publishInput = (bytes: Uint8Array) => ({
+    missionId: 'm1',
+    artifactId: 'a1',
+    idempotencyKey: 'k1',
+    approvedBy: 'u',
+    asset: asset(bytes),
+  });
+
+  it('retries the idempotent session init on a transient 5xx and completes the publish', async () => {
+    const wire = wireFixture({ initFlaky5xx: 1 });
+    const connector = new YoutubePublishConnector(connection, wire.fetchLike);
+    const outcome = await connector.publish(publishInput(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])));
+    expect(outcome.externalPostId).toBe('sbvid001');
+    expect(wire.calls.filter((c) => c.method === 'POST')).toHaveLength(2); // one flake, one recovery
+  });
+
+  it('resumes an interrupted upload from the session durable offset — committed bytes are never resent', async () => {
+    const wire = wireFixture({ uploadFlaky5xx: 1, partialCommit: 4 });
+    const connector = new YoutubePublishConnector(connection, wire.fetchLike);
+    const outcome = await connector.publish(publishInput(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])));
+    expect(outcome.externalPostId).toBe('sbvid001');
+    const putCalls = wire.calls.filter((c) => c.method === 'PUT' && c.url.includes('/upload/resumable/'));
+    // 1st: full 8 bytes -> 503; status query `bytes */8` -> 308 Range 0-3; resume: bytes 4-7 (4 bytes).
+    expect(putCalls).toHaveLength(3);
+    expect(putCalls[0]?.bodyBytes).toBe(8);
+    expect(putCalls[1]?.range).toBe('bytes */8');
+    expect(putCalls[2]?.range).toBe('bytes 4-7/8');
+    expect(putCalls[2]?.bodyBytes).toBe(4);
+  });
+
+  it('retries transient 5xx on videos.list and verifies after recovery', async () => {
+    const wire = wireFixture({ getFlaky5xx: 2 });
+    const connector = new YoutubePublishConnector(connection, wire.fetchLike);
+    const verification = await connector.verifyPublication({ externalPostId: 'sbvid001' });
+    expect(verification.exists).toBe(true);
+    expect(verification.uploadStatus).toBe('processed');
+    expect(wire.calls.filter((c) => c.method === 'GET' && c.url.includes('/youtube/v3/videos'))).toHaveLength(3);
+  });
+
+  it('retries transient 5xx on the analytics report and collects after recovery', async () => {
+    const wire = wireFixture({ getFlaky5xx: 1 });
+    const connector = new YoutubePublishConnector(connection, wire.fetchLike);
+    const page = await connector.analytics({
+      missionId: 'm1',
+      subjectExternalIds: ['sbvid001'],
+      metrics: ['views'],
+      from: '2026-10-23T00:00:00.000Z',
+      to: '2026-10-25T00:00:00.000Z',
+    });
+    expect(page.observations).toHaveLength(3);
+    expect(page.observations[0]?.value).toBe(1200);
+  });
+
+  it('surfaces persistent transients as the typed error after the bounded attempts (never an unbounded loop)', async () => {
+    const wire = wireFixture({ initFlaky5xx: 99 });
+    const connector = new YoutubePublishConnector(connection, wire.fetchLike);
+    await expect(
+      connector.publish(publishInput(new Uint8Array([9, 9, 9]))),
+    ).rejects.toMatchObject({ error: { kind: 'transient_network' } });
+    expect(wire.calls.filter((c) => c.method === 'POST')).toHaveLength(3); // exactly the bounded attempts
+  });
+
+  it('surfaces quota (429) immediately with the quota scope — no silent retry across the quota window', async () => {
+    const wire = wireFixture({ failInitWith: 429 });
+    const connector = new YoutubePublishConnector(connection, wire.fetchLike);
+    await expect(
+      connector.publish(publishInput(new Uint8Array([7, 7, 7]))),
+    ).rejects.toMatchObject({ error: { kind: 'rate_limited', quotaScope: 'connected-account:conn-test-1' } });
+    expect(wire.calls.filter((c) => c.method === 'POST')).toHaveLength(1);
   });
 });
 
