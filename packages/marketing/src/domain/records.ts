@@ -124,6 +124,14 @@ export const adCreative = z.object({
   lastObservedAt: isoDateTime,
   variations: z.array(z.string()).default([]),
   landingUrl: z.string().optional(),
+  /**
+   * Creative-adjacent source metadata (additive, W1-3(b) 2026-10-29 — mirrors
+   * OrganicContent.availableMetadata): platform-reported delivery dates,
+   * creative preview/image URLs, advertiser identity. Platform-REPORTED values
+   * live here, strictly distinct from our own observation timestamps above
+   * (firstObservedAt/lastObservedAt are when WE observed the creative).
+   */
+  availableMetadata: z.record(z.string(), z.unknown()).default({}),
 });
 export type AdCreative = z.infer<typeof adCreative>;
 

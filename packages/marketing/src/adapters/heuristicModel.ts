@@ -6,7 +6,6 @@
  * explicitly labeled in every output as internalReasoning evidence.
  */
 import type { ModelCapability, ModelPort, ModelTask } from '../app/ports.js';
-import { paidFixtures, organicFixtures } from './fixtures.js';
 
 const capabilities: ModelCapability[] = [
   {
@@ -61,7 +60,9 @@ export class HeuristicModel implements ModelPort {
         const req = input as { subjects: Array<{ id: string }> };
         return {
           features: req.subjects.map((s) => {
-            const isAd = s.id.startsWith('ad-');
+            // Paid-side records: synthetic fixtures (ad-*) and real Google Ads
+            // Transparency Center creatives (atc:*) share the ad feature shape.
+            const isAd = s.id.startsWith('ad-') || s.id.startsWith('atc:');
             const isMomentum = s.id === 'yt-102';
             return {
               subjectRef: s.id,
@@ -78,8 +79,20 @@ export class HeuristicModel implements ModelPort {
         };
       }
       case 'synthesizeStrategy': {
-        const hasPaid = paidFixtures.ads.length > 0;
-        const hasOrganic = organicFixtures.organic.length > 0;
+        // Echo the ACTUAL subject refs the caller extracted — the deterministic
+        // backend never invents evidence identities. Refusing an empty side
+        // beats fabricating refs that exist nowhere in the temporal store.
+        const req = input as {
+          adFeatures?: Array<{ subject: string }>;
+          organicFeatures?: Array<{ subject: string }>;
+        };
+        const adRefs = (req.adFeatures ?? []).map((f) => f.subject).slice(0, 2);
+        const organicRefs = (req.organicFeatures ?? []).map((f) => f.subject).slice(0, 2);
+        if (adRefs.length === 0 || organicRefs.length === 0) {
+          throw new Error(
+            `heuristic model refuses to synthesize the paid x organic intersection with an empty evidence side (ads: ${adRefs.length}, organic: ${organicRefs.length}) — research both sides first`,
+          );
+        }
         return {
           opportunities: [
             {
@@ -89,9 +102,9 @@ export class HeuristicModel implements ModelPort {
               format: '9:16 creator demo, 30s',
               demonstration: 'side-by-side before/after within creator context',
               cta: 'single low-friction CTA aligned with objective',
-              adEvidence: ['ad-rivalone-v0'],
-              organicEvidence: ['yt-102', 'yt-101'],
-              contradictedByRefs: hasPaid && hasOrganic ? [] : ['coverage-gap: ad library restricted'],
+              adEvidence: adRefs,
+              organicEvidence: organicRefs,
+              contradictedByRefs: [],
               predictedLow: 8000,
               predictedExpected: 14000,
               predictedHigh: 22000,

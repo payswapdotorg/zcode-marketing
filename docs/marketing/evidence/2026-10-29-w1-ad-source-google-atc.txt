@@ -1,0 +1,217 @@
+Google Ads Transparency Center access verification run — W1-3(b) (the paid-side gate)
+Date: 2026-10-29 (UTC)
+Environment: zcode-marketing fork sandbox — Node v24.22.1, pnpm 10.33.2, Linux x64
+Run: pnpm --filter @zcode/marketing verify:adsource  (exit code 0)
+Connector under test: connector:google-ads-transparency v0.1.0 (capabilities: research ONLY; authModel: public)
+Access path verified (keyless, no credentials, no cookies, no account):
+  - https://adstransparency.google.com/anji/_/rpc/SearchService/SearchSuggestions?authuser=
+    (advertiser discovery by name: advertiser id, country, ad-count range, verified flag)
+  - https://adstransparency.google.com/anji/_/rpc/SearchService/SearchCreatives?authuser=
+    (an advertiser's real ads in a region: creative id, format code, creative preview/image
+     URL, platform-reported first/last-shown dates, pagination token + totals)
+  Both are the public transparency service's own data endpoints — the same channel the
+  site serves to every visitor. Wire format captured live 2026-10-29 and mirrored in the
+  fixture-based unit tests (marketing-plugin test/google-atc-connector.test.ts).
+Test subjects (real market, real companies — portable espresso maker category):
+  - Wacaco Company Limited (AR14412319853346029569, HK) — ~100-200 ads reported in US
+  - AeroPress, Inc. (AR12134087531020943361, US) — ~96 ads reported in US
+Negative control: 'zz-no-such-advertiser-q7x9' — must resolve to NOTHING (no invented identities)
+Region: US (Google geo criterion id 2840, live-verified; full verified map: US GB CA AU DE FR JP HK)
+Verification protocol: docs/marketing/MARKETING-DATA-SOURCES.md ("Verification protocol", steps 2-3)
+NOTE: live network test by design (unit tests stay fixture-only per connector conformance rules).
+NOTE: sample records below are real public advertising data fetched during the run.
+INCIDENT (recorded honestly): during this run the keyless YouTube uploads RSS route
+  returned HTTP 404 for many channels (including Wacaco's UC-y91EU3KtDG_yZuSxeMI6w, which
+  served 15 real uploads in the 2026-10-28 organic verification and the 2026-10-29 W3-2
+  run), from plain HTTP AND a full Chrome browser — a platform-side partial outage. The
+  connector surfaces it as an explicit coverage gap; organic evidence stands on its
+  recorded 2026-10-28 verification. Part E therefore records the outage instead of running
+  the live intersection; the paid x organic intersection is exercised end-to-end on
+  recorded REAL wire payloads in the plugin chain tests (39/39, see WORK-REGISTRY W1-3).
+
+=======================================================================
+
+apps/zcode-cli                           |  WARN  Unsupported engine: wanted: {"node":"24.14.0"} (current: {"node":"v24.22.1","pnpm":"10.33.2"})
+
+> @zcode/marketing@ verify:adsource /home/z/my-project/zcode-marketing/packages/marketing
+> tsc --build . && node dist/demo/runAdSourceVerification.js
+
+
+== Health check (SearchSuggestions, keyless) ==
+{
+  "ok": true,
+  "detail": "public transparency service reachable — suggestion 'Nespresso UK Ltd' (AR17842550099100565505) resolved without credentials"
+}
+  ✔ public transparency service reachable and resolves a known advertiser without credentials
+
+== Research page summary ==
+{
+  "adCount": 184,
+  "accessMethod": "publicTransparency",
+  "coverage": [
+    {
+      "slice": "paid-ads:Wacaco",
+      "state": "available"
+    },
+    {
+      "slice": "paid-ads:AeroPress",
+      "state": "available"
+    },
+    {
+      "slice": "paid-ads:zz-no-such-advertiser-q7x9",
+      "state": "unavailable"
+    },
+    {
+      "slice": "paid-delivery-metrics:google-ads-transparency",
+      "state": "unavailable"
+    },
+    {
+      "slice": "paid-surface-split:google-ads-transparency",
+      "state": "unavailable"
+    },
+    {
+      "slice": "paid-targeting:google-ads-transparency",
+      "state": "unavailable"
+    },
+    {
+      "slice": "wire-format-stability:google-ads-transparency",
+      "state": "partial"
+    },
+    {
+      "slice": "request-budget:google-ads-transparency",
+      "state": "available"
+    }
+  ]
+}
+  ✔ page provenance declares the public-transparency retrieval method
+  ✔ real brand 'Wacaco' resolved to a real advertiser with real ads (resolved to 'Wacaco Company Limited' (AR14412319853346029569, HK); ~100-200 ads reported; service reported 97 total; ingested first 97 creative(s) over 3 bounded page(s))
+  ✔ negative control resolves to an honest coverage gap (no invented advertisers)
+  ✔ real ad creative records returned (184 ingested from the first bounded pages)
+  ✔ every ad record carries provenance (source identity + connector version)
+  ✔ serving surface honestly recorded (platform other + google-ads:-prefixed format — the source does not split Search/YouTube/Display per creative)
+  ✔ platform-reported first/last-shown delivery dates captured for real creatives
+  ✔ platform-REPORTED dates are kept strictly distinct from OUR observation timestamps (temporal discipline)
+  ✔ sample creatives include ads with recent platform-reported delivery activity (last shown within 90 days)
+  ✔ no-impressions/spend limitation reported explicitly (never over-claimed)
+  ✔ no-surface-split limitation reported explicitly
+
+== Sample real ad records (first 3) ==
+[
+  {
+    "kind": "AdCreative",
+    "id": "atc:CR00714731288753340417",
+    "missionId": "mission-w1b-verification",
+    "advertiserId": "AR14412319853346029569",
+    "source": {
+      "sourceId": "google-ads-transparency",
+      "sourceRecordId": "CR00714731288753340417",
+      "connectorVersion": "0.1.0"
+    },
+    "platform": "other",
+    "format": "google-ads: html5 display",
+    "firstObservedAt": "2026-10-29T04:33:23.185Z",
+    "lastObservedAt": "2026-10-29T04:33:23.185Z",
+    "variations": [],
+    "availableMetadata": {
+      "advertiserName": "Wacaco Company Limited",
+      "advertiserId": "AR14412319853346029569",
+      "region": "US",
+      "formatCode": 2,
+      "previewUrl": "https://displayads-formats.googleusercontent.com/ads/preview/content.js?client=ads-integrity-transparency&obfuscatedCustomerId=3668818780&creativeId=812349601659&uiFeatures=12,54&adGroupId=196075782126&itemIds=16967367738721104104&sig=ACiVB_xBuuZH-GMUPX0yDYxkjZdnaK1x5g&htmlParentId=fletch-render-5136011923249184933&responseCallback=fletchCallback5136011923249184933",
+      "platformReportedFirstShown": "2026-06-10T10:44:33.000Z",
+      "platformReportedLastShown": "2026-10-29T03:48:05.000Z",
+      "platformReportedActivitySignal": 141
+    }
+  },
+  {
+    "kind": "AdCreative",
+    "id": "atc:CR12890882870477848577",
+    "missionId": "mission-w1b-verification",
+    "advertiserId": "AR14412319853346029569",
+    "source": {
+      "sourceId": "google-ads-transparency",
+      "sourceRecordId": "CR12890882870477848577",
+      "connectorVersion": "0.1.0"
+    },
+    "platform": "other",
+    "format": "google-ads: html5 display",
+    "firstObservedAt": "2026-10-29T04:33:23.185Z",
+    "lastObservedAt": "2026-10-29T04:33:23.185Z",
+    "variations": [],
+    "availableMetadata": {
+      "advertiserName": "Wacaco Company Limited",
+      "advertiserId": "AR14412319853346029569",
+      "region": "US",
+      "formatCode": 2,
+      "previewUrl": "https://displayads-formats.googleusercontent.com/ads/preview/content.js?client=ads-integrity-transparency&obfuscatedCustomerId=3668818780&creativeId=764085238952&uiFeatures=12,54&adGroupId=183396891798&itemIds=14532292349602785439&sig=ACiVB_yGTdOo1oa-_JijJLCeYbznB958YQ&htmlParentId=fletch-render-804325415266363458&responseCallback=fletchCallback804325415266363458",
+      "platformReportedFirstShown": "2025-07-15T16:04:57.000Z",
+      "platformReportedLastShown": "2026-10-29T02:37:55.000Z",
+      "platformReportedActivitySignal": 471
+    }
+  },
+  {
+    "kind": "AdCreative",
+    "id": "atc:CR03219657190461669377",
+    "missionId": "mission-w1b-verification",
+    "advertiserId": "AR14412319853346029569",
+    "source": {
+      "sourceId": "google-ads-transparency",
+      "sourceRecordId": "CR03219657190461669377",
+      "connectorVersion": "0.1.0"
+    },
+    "platform": "other",
+    "format": "google-ads: display image",
+    "firstObservedAt": "2026-10-29T04:33:23.185Z",
+    "lastObservedAt": "2026-10-29T04:33:23.185Z",
+    "variations": [],
+    "availableMetadata": {
+      "advertiserName": "Wacaco Company Limited",
+      "advertiserId": "AR14412319853346029569",
+      "region": "US",
+      "formatCode": 1,
+      "imageUrl": "https://tpc.googlesyndication.com/archive/simgad/14574735324943347430",
+      "platformReportedFirstShown": "2023-10-25T04:05:38.000Z",
+      "platformReportedLastShown": "2026-10-29T00:41:19.000Z",
+      "platformReportedActivitySignal": 543
+    }
+  }
+]
+
+== Ingest (run 1) ==
+{
+  "acceptedEntities": 184,
+  "acceptedMetrics": 0,
+  "duplicatesIgnored": 0
+}
+  ✔ all real ad creatives ingested as new entities
+
+== Ingest (run 2 — fresh fetch of the same sources) ==
+{
+  "acceptedEntities": 0,
+  "acceptedMetrics": 0,
+  "duplicatesIgnored": 184
+}
+  ✔ a fresh fetch of the same sources accepts no new entities (source-identity idempotency on live paid data)
+
+== Ingest (run 3 — identical page re-ingested) ==
+{
+  "acceptedEntities": 0,
+  "acceptedMetrics": 0,
+  "duplicatesIgnored": 184
+}
+  ✔ re-ingesting the identical page is a no-op (no entity inflation)
+
+== Part E — real paid x organic intersection (same real market) ==
+
+== Organic route incident (recorded honestly) ==
+{
+  "gapSlice": "organic-uploads:Wacaco",
+  "note": "not resolvable through permitted public routes in this run: coverage_gap — no uploads feed for channel UC-y91EU3KtDG_yZuSxeMI6w (HTTP 404)",
+  "conclusion": "keyless uploads RSS route unavailable for this channel in this run (platform-side outage observed 2026-10-29) — organic evidence remains the recorded 2026-10-28 verification; the paid x organic intersection is additionally exercised end-to-end on recorded REAL wire payloads in the plugin chain tests (marketing-plugin test suite)"
+}
+  ✔ organic outage surfaces as an explicit honest coverage gap (never invented content)
+  ✔ note: Part E intersection skipped this run — organic route outage recorded; paid side (the W1-3(b) subject) fully verified above.
+
+AD-SOURCE ACCESS VERIFICATION COMPLETE.
+Ad side: Google Ads Transparency Center (region US, geo id 2840) VERIFIED — see evidence file.
+Organic side: unchanged, verified 2026-10-28 (keyless YouTube public routes).

@@ -12,7 +12,8 @@
     "build": "tsc --build .",
     "demo:loop": "tsc --build . && node dist/demo/runLoop.js",
     "demo:sqlite": "tsc --build . && node dist/demo/runSqliteConformance.js",
-    "verify:sources": "tsc --build . && node dist/demo/runSourceVerification.js"
+    "verify:sources": "tsc --build . && node dist/demo/runSourceVerification.js",
+    "verify:adsource": "tsc --build . && node dist/demo/runAdSourceVerification.js"
   },
   "dependencies": {
     "zod": "4.6.5"

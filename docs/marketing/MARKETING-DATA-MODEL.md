@@ -12,7 +12,7 @@ These are **domain contracts**, not a mandate for eleven unrelated database syst
 | --- | --- | --- |
 | `ProductBrief` | Product, audience, market, offer, objective, constraints | product, audience, country, platform, offer, objective, constraints, createdByMission |
 | `CompetitorEntity` | Companies, brands, sellers, accounts, landing pages with identity confidence | displayName, aliases[], identityConfidence, relevanceReason, evidenceRefs[], sourceRecords[] |
-| `AdCreative` | Observable ad content, advertiser, variations, source identifiers | advertiserId, sourceIds{}, variations[], format, firstObservedAt, lastObservedAt |
+| `AdCreative` | Observable ad content, advertiser, variations, source identifiers | advertiserId, sourceIds{}, variations[], format, firstObservedAt, lastObservedAt, availableMetadata{} (additive 2026-10-29: platform-REPORTED delivery metadata — first/last-shown dates, creative URLs — kept strictly distinct from our own observation timestamps) |
 | `OrganicContent` | Public content, author/account, format, publication timestamp, available metadata | authorId, platform, format, publishedAt, sourceIds{}, availableMetadata |
 | `MetricObservation` | A metric value at a particular observation time, with source and metric definition | subjectRef, metricKey, value, observedAt, source, metricDef (semantics + version) |
 | `CreativeFeatureSet` | Extracted hooks, topics, formats, messages, narrative structures, CTAs | subjectRef, hooks[], narrative[], offerStructure, visualStructure, extractionModelRef |

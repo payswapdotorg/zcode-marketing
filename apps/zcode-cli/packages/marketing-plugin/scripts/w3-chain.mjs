@@ -137,16 +137,18 @@ try {
     researchMode: 'live',
     missionId: 'mission-w3-live',
   });
+  // 'RivalOne' is a fictional brand: the REAL Google Ads Transparency Center
+  // resolves no advertiser for it, so live mode observes zero ad evidence and
+  // must refuse ranking with the typed paid_source_gap error (never invent).
   await call('marketing_discover_competitors', { missionId: 'mission-w3-live', hints: ['RivalOne'] });
   await call('marketing_research_platform', { missionId: 'mission-w3-live' });
   const liveRank = await call('marketing_rank_opportunities', { missionId: 'mission-w3-live' });
-  assert(liveRank.isError && liveRank.text.includes('paid_source_gap'), 'live mode refuses ranking without a verified ad source');
+  assert(liveRank.isError && liveRank.text.includes('paid_source_gap'), 'live mode refuses ranking when no ad evidence was observed (fictional brand resolves to no real ads)');
   const liveReport = await call('marketing_mission_report', { missionId: 'mission-w3-live' });
   assert(
     !liveReport.isError && liveReport.text.includes('W1-3(b)'),
-    'live report states the open ad-source blocker instead of inventing data',
+    'live report states the ad-source coverage limits honestly instead of inventing data',
   );
-
   section('9. mission list (workspace persistence)');
   const list = await call('marketing_mission_list', {});
   assert(list.text.includes('mission-w3-chain') && list.text.includes('mission-w3-live'), 'missions persisted in the workspace index');

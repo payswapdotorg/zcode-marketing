@@ -46,4 +46,10 @@ export { FallbackModelPort } from './adapters/fallbackModel.js';
 export { SqliteTemporalStore } from './adapters/sqliteStore.js';
 export { YoutubePublicConnector, channelCandidate } from './adapters/sources/youtubePublic.js';
 export type { FetchLike } from './adapters/sources/youtubePublic.js';
+export {
+  GoogleAdsTransparencyConnector,
+  advertiserCandidate,
+  ATC_GEO_IDS,
+} from './adapters/sources/googleAdsTransparency.js';
+export type { TransparencyFetchLike } from './adapters/sources/googleAdsTransparency.js';
 export { paidFixtures, organicFixtures, groundTruth } from './adapters/fixtures.js';

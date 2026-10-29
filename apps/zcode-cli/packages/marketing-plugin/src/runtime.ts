@@ -21,6 +21,7 @@ import {
   SampleConnector,
   SqliteTemporalStore,
   YoutubePublicConnector,
+  GoogleAdsTransparencyConnector,
   competitorCandidate,
   coverageReport,
   productBrief,
@@ -33,6 +34,7 @@ import type {
   ProductBrief,
   TemporalStorePort,
 } from '@zcode/marketing';
+import type { TransparencyFetchLike } from '@zcode/marketing';
 import { McpSamplingModel, type SamplingClient } from './samplingModel.js';
 
 export const researchMode = z.enum(['live', 'demo']);
@@ -136,6 +138,8 @@ export interface RuntimeOptions {
   now?: () => string;
   /** Injectable fetch so the YouTube public connector stays offline in tests. */
   fetchLike?: (url: string) => Promise<{ status: number; body: string }>;
+  /** Injectable POST fetch so the transparency connector stays offline in tests. */
+  transparencyFetchLike?: TransparencyFetchLike;
 }
 
 export class MarketingRuntime {
@@ -203,6 +207,17 @@ export class MarketingRuntime {
       children.push(
         this.opts.fetchLike ? new YoutubePublicConnector(this.opts.fetchLike) : new YoutubePublicConnector(),
       );
+      if (entry.researchMode === 'live') {
+        // W1-3(b) verified ad-intelligence source (2026-10-29): live youtube
+        // missions now ingest real paid-side creatives from the Google Ads
+        // Transparency Center (ads served on Google surfaces incl. YouTube,
+        // mission region). Synthetic fixtures are NEVER used in live mode.
+        children.push(
+          this.opts.transparencyFetchLike
+            ? new GoogleAdsTransparencyConnector(this.opts.transparencyFetchLike)
+            : new GoogleAdsTransparencyConnector(),
+        );
+      }
     }
     if (entry.researchMode === 'demo') {
       // Synthetic fixtures, labeled as such by the connector's own coverage

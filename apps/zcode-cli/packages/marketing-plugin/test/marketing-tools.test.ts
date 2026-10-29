@@ -41,6 +41,98 @@ const fixtureFetch = async (url: string): Promise<{ status: number; body: string
   return { status: 404, body: '' };
 };
 
+/**
+ * Google Ads Transparency Center wire fixtures — REAL recorded responses
+ * (captured live 2026-10-29 against the public service, region US; see
+ * docs/marketing/evidence/2026-10-29-w1-ad-source-google-atc.txt). Trimmed to
+ * the first creatives; field numbers are the service's own wire format.
+ */
+const WACACO_SUGGESTIONS = {
+  1: [
+    { 1: { 1: 'Wacaco Company Limited', 2: 'AR14412319853346029569', 3: 'HK', 4: { 2: { 1: '100', 2: '200' } } } },
+    { 2: { 1: 'wacaco.com' } },
+  ],
+};
+const WACACO_CREATIVES_PAGE_1 = {
+  1: [
+    {
+      1: 'AR14412319853346029569',
+      2: 'CR15113976961002635265',
+      3: { 3: { 2: '<img src="https://tpc.googlesyndication.com/archive/simgad/12660767253002200144" height="503" width="348">' }, 5: true },
+      4: 1,
+      6: { 1: '1698208917', 2: 503414000 },
+      7: { 1: '1787606306', 2: 228676000 },
+      12: 'Wacaco Company Limited',
+      13: 670,
+    },
+    {
+      1: 'AR14412319853346029569',
+      2: 'CR01878771699185352705',
+      3: { 3: { 2: '<img src="https://tpc.googlesyndication.com/archive/simgad/9430771652111319698" height="277" width="364">' } },
+      4: 1,
+      6: { 1: '1698209691', 2: 124888000 },
+      7: { 1: '1787571022', 2: 961688000 },
+      12: 'Wacaco Company Limited',
+      13: 955,
+    },
+    {
+      1: 'AR14412319853346029569',
+      2: 'CR10768865612584189953',
+      3: { 1: { 4: 'https://displayads-formats.googleusercontent.com/ads/preview/content.js?client=ads-integrity-transparency&obfuscatedCustomerId=3668818780&creativeId=700805243666&uiFeatures=12,54&adGroupId=161597968686&itemIds=17473667542164887519&sig=ACiVB_xhnf-pCPR4Ff1HpYe2w2TirxsL8Q' } },
+      4: 2,
+      6: { 1: '1716876239', 2: 331169000 },
+      7: { 1: '1787569050', 2: 52049000 },
+      12: 'Wacaco Company Limited',
+      13: 770,
+    },
+  ],
+  2: 'CgoAP7zmmCYkvBaDEhD-irPsdQf0UQ1IlgMAAAAAGhn8-Gwm-PuuTsA=',
+  4: '97',
+  5: '97',
+};
+const WACACO_CREATIVES_PAGE_2 = {
+  1: [
+    // Duplicate of page 1 entry — exercises local dedupe + store idempotency.
+    {
+      1: 'AR14412319853346029569',
+      2: 'CR15113976961002635265',
+      3: { 3: { 2: '<img src="https://tpc.googlesyndication.com/archive/simgad/12660767253002200144" height="503" width="348">' }, 5: true },
+      4: 1,
+      6: { 1: '1698208917', 2: 503414000 },
+      7: { 1: '1787606306', 2: 228676000 },
+      12: 'Wacaco Company Limited',
+      13: 670,
+    },
+    {
+      1: 'AR14412319853346029569',
+      2: 'CR04109150251812651009',
+      3: { 1: { 4: 'https://displayads-formats.googleusercontent.com/ads/preview/content.js?client=ads-integrity-transparency&obfuscatedCustomerId=3668818780&creativeId=700805243423&uiFeatures=12,54&adGroupId=161597966846&versionId=1&sig=ACiVB_ylsMl25_sn6QP8YBUbOv1C4Tk4AQ' } },
+      4: 3,
+      6: { 1: '1753546944', 2: 336710000 },
+      7: { 1: '1787551993', 2: 271192000 },
+      12: 'Wacaco Company Limited',
+      13: 260,
+    },
+  ],
+  4: '97',
+  5: '97',
+};
+
+/** Transparency fixture fetch: recorded wire payloads; unknown names resolve to {} (honest empty). */
+let atcCreativesCalls = 0;
+const atcFixtureFetch = async (url: string, body: string): Promise<{ status: number; body: string }> => {
+  const decoded = decodeURIComponent(body);
+  if (url.includes('SearchSuggestions')) {
+    if (decoded.includes('Wacaco')) return { status: 200, body: JSON.stringify(WACACO_SUGGESTIONS) };
+    return { status: 200, body: '{}' }; // honest empty — no invented advertisers
+  }
+  if (url.includes('SearchCreatives')) {
+    atcCreativesCalls += 1;
+    return { status: 200, body: JSON.stringify(atcCreativesCalls === 1 ? WACACO_CREATIVES_PAGE_1 : WACACO_CREATIVES_PAGE_2) };
+  }
+  return { status: 404, body: '' };
+};
+
 describe('marketing plugin tool chain', () => {
   let root: string;
   let runtime: MarketingRuntime;
@@ -55,7 +147,7 @@ describe('marketing plugin tool chain', () => {
 
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'marketing-plugin-'));
-    runtime = new MarketingRuntime(root, { fetchLike: fixtureFetch });
+    runtime = new MarketingRuntime(root, { fetchLike: fixtureFetch, transparencyFetchLike: atcFixtureFetch });
     const server = createMarketingServer(runtime);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await server.connect(serverTransport);
@@ -194,6 +286,60 @@ describe('marketing plugin tool chain', () => {
     expect(report.isError).toBe(false);
     expect(report.text).toContain('No ranked opportunities');
     expect(report.text).toContain('W1-3(b)');
+  });
+
+  it('live mode ingests real transparency-center ads and ranks a REAL paid x organic intersection', async () => {
+    // W1-3(b) closed: live youtube missions get their paid side from the
+    // verified Google Ads Transparency Center connector (recorded wire
+    // fixtures — no synthetic paid data anywhere in live mode).
+    const start = await call('marketing_mission_start', {
+      product: 'portable espresso maker',
+      audience: 'commuting coffee drinkers, 25-40',
+      country: 'US',
+      platform: 'youtube',
+      offer: '30-day trial',
+      objective: 'awareness',
+      researchMode: 'live',
+      missionId: 'mission-atc-live-test',
+    });
+    expect(start.isError).toBe(false);
+    await call('marketing_discover_competitors', { missionId: 'mission-atc-live-test', hints: ['Wacaco'] });
+
+    const research = await call('marketing_research_platform', { missionId: 'mission-atc-live-test' });
+    expect(research.isError).toBe(false);
+    const coverage = (research.structured as { coverage: { slices: Array<{ state: string; slice: string }> } }).coverage;
+    expect(coverage.slices.some((s) => s.slice === 'paid-ads:Wacaco' && s.state === 'available')).toBe(true);
+    expect(
+      coverage.slices.some((s) => s.slice === 'paid-delivery-metrics:google-ads-transparency' && s.state === 'unavailable'),
+    ).toBe(true);
+    const ingested = (research.structured as { ingested: { ads: number; organic: number } }).ingested;
+    // 3 creatives on page 1 + 2 on page 2 with one duplicate → 4 unique REAL ads.
+    expect(ingested.ads).toBe(4);
+    expect(ingested.organic).toBeGreaterThanOrEqual(1);
+
+    const loaded = await runtime.open('mission-atc-live-test');
+    const ads = loaded.mission.store.allAds();
+    expect(ads.every((a) => a.id.startsWith('atc:'))).toBe(true);
+    expect(ads.every((a) => a.platform === 'other' && a.format.startsWith('google-ads:'))).toBe(true);
+    expect(
+      ads.every((a) => typeof a.availableMetadata.platformReportedFirstShown === 'string'),
+    ).toBe(true);
+
+    const rank = await call('marketing_rank_opportunities', { missionId: 'mission-atc-live-test' });
+    expect(rank.isError).toBe(false);
+    const opportunities = (rank.structured as { opportunities: Array<{ hypothesis: { supportedBy: Array<{ ref: string }> } }> }).opportunities;
+    expect(opportunities.length).toBeGreaterThan(0);
+    // The intersection references BOTH real paid (atc:*) and real organic (yt:*) evidence.
+    expect(opportunities[0]!.hypothesis.supportedBy.some((e) => e.ref.startsWith('atc:'))).toBe(true);
+    expect(opportunities[0]!.hypothesis.supportedBy.some((e) => e.ref.startsWith('yt:'))).toBe(true);
+
+    const evidence = await call('marketing_evidence_view', { missionId: 'mission-atc-live-test' });
+    expect(evidence.isError).toBe(false);
+    expect(evidence.text).toContain('atc:');
+
+    const report = await call('marketing_mission_report', { missionId: 'mission-atc-live-test' });
+    expect(report.isError).toBe(false);
+    expect(report.text).toContain('Google Ads Transparency Center');
   });
 
   it('refuses platforms without a verified connector (fail fast, honest)', async () => {

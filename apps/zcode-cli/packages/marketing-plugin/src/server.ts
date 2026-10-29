@@ -36,9 +36,9 @@ const textResult = (text: string, structuredContent?: Record<string, unknown>) =
 });
 
 const PLATFORM_HINT =
-  "Only platforms with a verified connector may be researched (MARKETING-DATA-SOURCES.md). 'youtube' is verified via keyless public routes; 'tiktok'/'meta' require the W1-3(b) ad-source decision first.";
+  "Only platforms with a verified connector may be researched (MARKETING-DATA-SOURCES.md). 'youtube' is verified: organic via keyless public routes + paid via the Google Ads Transparency Center (W1-3(b), verified 2026-10-29); 'tiktok'/'meta' have no verified connector yet.";
 const MODE_HINT =
-  "researchMode 'demo' additionally ingests the labeled synthetic fixtures (connector:sample) so the full paid x organic loop works end to end; 'live' uses verified sources only — the paid side is an explicit coverage gap until W1-3(b) closes.";
+  "researchMode 'demo' additionally ingests the labeled synthetic fixtures (connector:sample) so the full paid x organic loop works end to end; 'live' uses verified sources only — real paid-side ads come from the Google Ads Transparency Center, and every coverage limitation is reported, never silently filled.";
 
 /** Shared output shapes (raw zod shapes, canonical records reused). */
 const opportunityScoreShape = {
@@ -310,7 +310,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
     'marketing_rank_opportunities',
     {
       description:
-        'Rank cross-source creative opportunities (Stages C+D): objective-appropriate performance signals over comparable windows, then the paid x organic intersection with SEPARATED observed / cross-source / predicted / confidence scores and contrary evidence. In live mode the paid side is an explicit gap until a verified ad source connects (W1-3(b)); use demo mode to exercise the full intersection.',
+        'Rank cross-source creative opportunities (Stages C+D): objective-appropriate performance signals over comparable windows, then the paid x organic intersection with SEPARATED observed / cross-source / predicted / confidence scores and contrary evidence. Live youtube missions ingest real paid-side ads from the Google Ads Transparency Center (W1-3(b) verified); when a mission has no ad observations the tool refuses with paid_source_gap instead of inventing evidence.',
       input: { missionId: z.string().min(1) },
       output: { opportunities: z.array(z.object(opportunityScoreShape)) },
       readOnly: true,
@@ -320,7 +320,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
       if (mission.store.allAds().length === 0) {
         throw new MarketingToolError(
           'paid_source_gap',
-          `no ad observations in this mission — the paid x organic intersection needs a verified ad-intelligence source, which is blocked on credentials (W1-3(b), see MARKETING-DATA-SOURCES.md). Current mode '${entry.researchMode}': in demo mode the labeled synthetic fixtures provide the paid side.`,
+          `no ad observations in this mission — the paid x organic intersection needs ad evidence. Live youtube missions ingest the Google Ads Transparency Center (W1-3(b) verified 2026-10-29): zero ads usually means none of the mission's competitors resolved to an advertiser with ads in the mission region — check the research coverage report (per-competitor resolution outcomes are recorded there). Current mode '${entry.researchMode}': in demo mode the labeled synthetic fixtures provide the paid side.`,
         );
       }
       const adFeatures = await mission.extractFeatures(mission.store.allAds());
@@ -371,7 +371,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
       ]);
       let opportunities: OpportunityScore[] = [];
       let opportunityNote =
-        'No ranked opportunities: the paid x organic intersection needs a verified ad-intelligence source — blocked on credentials (W1-3(b)). Run in demo mode to see the loop with labeled synthetic fixtures.';
+        'No ranked opportunities: no ad evidence was ingested — check the research coverage report for per-competitor ad-source resolution outcomes, or run demo mode to see the loop with labeled synthetic fixtures.';
       let extractionModelRefs: string[] = [];
       if (mission.store.allAds().length > 0) {
         const adFeatures = await mission.extractFeatures(mission.store.allAds());
@@ -444,7 +444,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
         extractionNote,
         '- View counts are current-snapshot public stats, not full history; velocity uses comparable 7-day windows.',
         entry.researchMode === 'live'
-          ? '- Ad intelligence: no verified source connected yet (W1-3(b) open blocker).'
+          ? '- Ad intelligence (Google Ads Transparency Center, W1-3(b) verified): real creatives with platform-reported first/last-shown dates — no impressions/spend/ROAS, no per-creative surface split, no targeting data; wire format is the public service data channel (drift risk recorded in MARKETING-DATA-SOURCES.md).'
           : '- Demo mode: do not treat fixture numbers as market facts.',
       );
       const text = sections.join('\n\n');

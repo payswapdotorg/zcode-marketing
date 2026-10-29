@@ -16,7 +16,8 @@
   （输出复用领域记录），副作用经 annotations 声明；本波次无任何 destructive 工具，
   publishing 属 W5 且是独立权限域。
 - **诚实口径不可协商**：覆盖缺口显式返回（`coverage_gap` 是正常结果，不是错误）；
-  live 模式没有已验证广告源时排序工具返回 `paid_source_gap` 类型化错误，
+  live 模式的付费侧来自已验证的 `connector:google-ads-transparency`（W1-3(b) 已于 2026-10-29 验证）；
+  仅当任务真实观测到零条广告证据时排序工具才返回 `paid_source_gap` 类型化错误，
   绝不编造广告证据；demo 模式的合成 fixture 在每个覆盖切片与报告里标注。
 - **mission 状态只落工作区**：索引 `missions-index.json` + 每任务一个 SQLite 时序库
   （复用 W2 的 `SqliteTemporalStore`，幂等摄取、显式修订）；进程重启后仍可读。

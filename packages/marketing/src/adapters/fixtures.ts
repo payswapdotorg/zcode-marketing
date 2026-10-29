@@ -25,6 +25,7 @@ const mk = {
       firstObservedAt: new Date(Date.now() - (days + i) * 86_400_000).toISOString(),
       lastObservedAt: new Date(Date.now() - i * 86_400_000).toISOString(),
       variations: [v],
+      availableMetadata: { synthetic: true, note: 'labeled fixture creative (not real market data)' },
     }));
   },
   organic(id: string, authorId: string, format: string, daysOld: number): OrganicContent {
