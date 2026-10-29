@@ -1,0 +1,33 @@
+================================================================================
+W3-4 — Marketing workspace panel: browser E2E verification run
+Date: 2026-10-29 07:59 UTC  ·  exit code: 0
+Reproduce: pnpm --filter @zcode/marketing-plugin demo:w3-4
+================================================================================
+
+W3-4 marketing workspace panel — browser E2E gates
+server: /home/z/my-project/zcode/apps/zcode-cli/packages/marketing-plugin/dist/server.mjs (real bundled plugin process)
+panel: ui://marketing/panel.html (618 KiB self-contained resource)
+browser: chromium 143.0.7499.4 — MCP Apps AppBridge host, desktop sandbox CSP
+artifacts: /tmp/marketing-panel-e2e
+
+PASS  panel-connects-and-renders-hero — onboarding form visible after MCP Apps handshake
+PASS  onboarding-form-starts-mission — mission view renders the persisted brief
+PASS  panel-discovery-confirms-competitors — 2 candidates user-confirmed and persisted
+PASS  panel-research-renders-coverage — coverage slices rendered: unavailable, unavailable, unavailable, not_connected, available, restricted
+PASS  evidence-tab-renders-provenance — 3 provenance tables rendered
+PASS  agent-tool-result-refreshes-panel — mission list updated from a forwarded tool result, no panel action
+PASS  report-renders-ranked-opportunities — 1 opportunities with 5 separated score chips (observed / cross-source / predicted / confidence)
+PASS  no-page-errors — clean console
+
+no page errors
+
+
+--------------------------------------------------------------------------------
+Visual verification (GLM-5V over the artifacts, recorded 2026-10-29):
+- 03-coverage-rendered.png: coverage slices with distinct state badges (unavailable/not_connected/
+  available/restricted), provenance column, honest conclusion statement rendered.
+- 05-agent-push-refreshed.png (full panel): ranked opportunity #1 with separated score chips
+  (observed 4112.5 / cross-source 1.0 / predicted 14000 / confidence 0.60 / forecast
+  8000-22000 views), performance signals section, two missions in the sidebar, demo-mode
+  notice. No rendering defects reported.
+================================================================================

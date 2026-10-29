@@ -248,7 +248,10 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
   ),
   // 营销情报插件（本 fork 新增，W3-1）：MCP server 由 marketing-plugin 构建产物 dist/server.mjs
   // 提供，技能引导 Agent 走 mission 工具链；治理唯一事实源 docs/marketing/。
+  // W3-4：工作台面板 dist/panel.html 作为 ui://marketing/panel.html 资源随插件发布
+  // （ui.surfaces 在插件清单里声明，与 office 面板同一约定）。
   {
+    componentTypes: ["ui"],
     defaultEnabled: true,
     listing: {
       author: ZAI_AUTHOR,
@@ -256,19 +259,19 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
       displayName: "Marketing Intelligence",
       displayName_i18n: { "zh-CN": "营销情报" },
       description_i18n: {
-        "zh-CN": "证据支撑的营销情报任务：竞品调研、创意结构分析与显式标注数据空缺的机会排序。",
+        "zh-CN": "证据支撑的营销情报任务：竞品调研、创意结构分析与显式标注数据空缺的机会排序，含营销工作台面板。",
       },
     },
     name: "marketing",
     // 与文档插件同一约定：dist 构建产物先于 bootstrap 种子校验（turbo test dependsOn build）。
-    requiredSeedPaths: ["dist/server.mjs", "skills/marketing/SKILL.md"],
+    requiredSeedPaths: ["dist/server.mjs", "dist/panel.html", "skills/marketing/SKILL.md"],
     rootCandidates: [
       "packages/marketing-plugin",
       "../marketing-plugin",
       "../../marketing-plugin",
       "../../../marketing-plugin",
     ],
-    version: "0.2.0",
+    version: "0.3.0",
   },
   {
     // 沿用原聚合文档插件的官方搜图能力，仅拆出独立开关；认证仍由官方 MCP adapter 注入。

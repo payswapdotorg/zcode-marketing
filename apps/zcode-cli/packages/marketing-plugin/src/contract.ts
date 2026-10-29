@@ -13,7 +13,7 @@
 export const MARKETING_PLUGIN_NAME = "marketing";
 
 /** 构建后在插件根目录下必定存在的产物；官方 seed 缺任一项即视为残缺插件。 */
-export const MARKETING_PLUGIN_OUTPUTS = ["dist/server.mjs"] as const;
+export const MARKETING_PLUGIN_OUTPUTS = ["dist/server.mjs", "dist/panel.html"] as const;
 
 /** 随插件发布的技能文件（requiredSeedPaths 的另一部分，模型可见的作业指引）。 */
 export const MARKETING_PLUGIN_SKILL = "skills/marketing/SKILL.md" as const;
@@ -36,6 +36,22 @@ export const MARKETING_TOOLS = [
 ] as const;
 
 export type MarketingTool = (typeof MARKETING_TOOLS)[number];
+
+/** W3-4：工作台面板作为 ui:// 资源由 marketing server 提供（office 面板同款约定）。 */
+export const MARKETING_PANEL = {
+  surfaceId: "marketing",
+  resourceUri: "ui://marketing/panel.html",
+  mimeType: "text/html;profile=mcp-app",
+} as const;
+
+/** 路由到面板的工具（结果同步刷新面板）：其余工具保持纯数据可见性（仅 model）。 */
+export const MARKETING_PANEL_TOOLS = [
+  "marketing_mission_start",
+  "marketing_discover_competitors",
+  "marketing_research_platform",
+  "marketing_mission_report",
+  "marketing_evidence_view",
+] as const;
 
 export interface MarketingPluginContract {
   /** 插件名（= MCP server 名 = 官方定义 id 前缀）。 */

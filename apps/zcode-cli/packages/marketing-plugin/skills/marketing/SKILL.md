@@ -14,13 +14,18 @@ non-negotiable.
 1. **Start** — `marketing_mission_start` with what the user told you:
    product, audience, offer, objective, country, platform. Ask for anything
    missing. `researchMode`:
-   - `live` — verified public sources only (YouTube keyless routes). The paid
-     side is an explicit coverage gap until a verified ad-intelligence source
-     connects (W1-3(b) blocker).
+   - `live` — verified public sources only: organic via the keyless YouTube
+     public routes, paid via the Google Ads Transparency Center keyless public
+     route (both W1-3-verified; MARKETING-DATA-SOURCES.md). Real creatives,
+     real advertisers; no impressions/spend/ROAS — stated as coverage limits.
    - `demo` — additionally ingests the labeled synthetic fixtures
      (`connector:sample`), so the full paid x organic loop runs end to end.
      Fixture numbers are never market facts; say so in every summary.
    Only platforms with a verified connector are valid (currently `youtube`).
+   The user can also start, discover, and research missions from the Marketing
+   workspace panel (the plugin's `ui.surfaces` entry); results of your tool
+   calls route there automatically. Talk the user through the panel when they
+   prefer a visual workbench over chat-driven steps.
 2. **Discover competitors** — `marketing_discover_competitors` with 2-5 name
    hints. Show the candidates to the user with their relevance reasons and
    identity confidence; apply corrections, re-call with `confirm` for the names
@@ -39,16 +44,31 @@ non-negotiable.
 5. **Rank opportunities** — `marketing_rank_opportunities` (Stages C+D). Scores
    are SEPARATED (observed / cross-source support / predicted / confidence);
    present them as four distinct numbers and always cite the evidence refs and
-   contrary evidence. In live mode with no ad source this returns a
-   `paid_source_gap` error — state the gap to the user instead of inventing
-   rankings.
+   contrary evidence. In live mode, zero ad observations returns a
+   `paid_source_gap` error — usually none of the mission's competitors resolved
+   to an advertiser with ads in the mission region; state the gap to the user
+   instead of inventing rankings.
 6. **Report** — `marketing_mission_report` composes the evidence-backed report
    the user reads: brief, competitors, coverage (explicit gaps), signals,
    opportunities, limitations. Deliver it verbatim; never drop the limitations
    section.
 7. **Evidence trail** — `marketing_evidence_view` when the user asks where a
    number came from. Every record carries source id, connector version, and
-   observation time.
+   observation time. The same trail renders in the workspace panel's Evidence
+   tab.
+
+## The workspace panel (W3-4)
+
+The plugin ships a branded Marketing panel (`ui://marketing/panel.html`, the
+office-panel convention): mission list, onboarding form, competitor discovery
+and confirmation, one-click idempotent research, the honest coverage report,
+performance signals, ranked opportunities with separated scores, and the full
+evidence trail with provenance. Panel-routed tools (`marketing_mission_start`,
+`marketing_discover_competitors`, `marketing_research_platform`,
+`marketing_mission_report`, `marketing_evidence_view`) declare
+`_meta.ui.resourceUri` so the host forwards their results to the surface — the
+panel refreshes as you work. The panel calls the same tools you do; there is no
+parallel data path.
 
 ## Honesty rules
 

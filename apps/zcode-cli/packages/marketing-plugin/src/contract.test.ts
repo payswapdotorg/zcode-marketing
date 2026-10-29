@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { marketingPluginModule } from "./module.js";
 import {
   MARKETING_MISSIONS_INDEX,
+  MARKETING_PANEL,
+  MARKETING_PANEL_TOOLS,
   MARKETING_PLUGIN_OUTPUTS,
   MARKETING_PLUGIN_SKILL,
   MARKETING_TOOLS,
@@ -21,12 +23,21 @@ describe("marketing-plugin contract", () => {
   it("declares the plugin outputs the official seed depends on", () => {
     expect([...MARKETING_PLUGIN_OUTPUTS, MARKETING_PLUGIN_SKILL]).toEqual([
       "dist/server.mjs",
+      "dist/panel.html",
       "skills/marketing/SKILL.md",
     ]);
   });
 
   it("keeps the tool roster free of publishing tools (W5 scope, separate permission domain)", () => {
     expect(MARKETING_TOOLS.every((name) => !name.includes("publish"))).toBe(true);
+  });
+
+  it("declares the workspace panel surface exactly once, on the marketing server", () => {
+    expect(MARKETING_PANEL.surfaceId).toBe("marketing");
+    expect(MARKETING_PANEL.resourceUri).toBe("ui://marketing/panel.html");
+    expect(MARKETING_PANEL.mimeType).toBe("text/html;profile=mcp-app");
+    expect(MARKETING_PANEL_TOOLS.every((name) => MARKETING_TOOLS.includes(name))).toBe(true);
+    expect(new Set(MARKETING_PANEL_TOOLS).size).toBe(MARKETING_PANEL_TOOLS.length);
   });
 
   it("roots every mission artifact under the workspace .zcode/marketing directory", () => {

@@ -9,6 +9,9 @@
  * this wave is destructive. Coverage gaps and synthetic evidence are always
  * stated explicitly; the model never has to guess what is real.
  */
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import {
@@ -27,13 +30,27 @@ import type { OpportunityScore } from '@zcode/marketing';
 import { MarketingRuntime, MarketingToolError, missionIndexEntry, researchMode } from './runtime.js';
 
 export const PLUGIN_NAME = 'marketing';
-export const PLUGIN_VERSION = '0.2.0';
+export const PLUGIN_VERSION = '0.3.0';
 export const SERVER_NAME = 'marketing';
+
+/** W3-4: the workspace panel served as a ui:// resource (office-panel pattern). */
+export const PANEL_URI = 'ui://marketing/panel.html';
+export const PANEL_MIME = 'text/html;profile=mcp-app';
+export const SURFACE_ID = 'marketing';
+
+/** Resolves dist/panel.html next to the built server entry (dist/server.mjs). */
+const defaultPanelHtml = async (): Promise<string> =>
+  readFile(join(dirname(fileURLToPath(import.meta.url)), 'panel.html'), 'utf8');
 
 const textResult = (text: string, structuredContent?: Record<string, unknown>) => ({
   content: [{ type: 'text' as const, text }],
   ...(structuredContent ? { structuredContent } : {}),
 });
+
+export interface MarketingServerOptions {
+  /** Injectable for tests; default reads dist/panel.html next to the server entry. */
+  panelHtml?: () => Promise<string>;
+}
 
 const PLATFORM_HINT =
   "Only platforms with a verified connector may be researched (MARKETING-DATA-SOURCES.md). 'youtube' is verified: organic via keyless public routes + paid via the Google Ads Transparency Center (W1-3(b), verified 2026-10-29); 'tiktok'/'meta' have no verified connector yet.";
@@ -56,8 +73,12 @@ const performanceSignalShape = {
   note: z.string(),
 };
 
-export function createMarketingServer(runtime: MarketingRuntime): McpServer {
+export function createMarketingServer(
+  runtime: MarketingRuntime,
+  options: MarketingServerOptions = {},
+): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: PLUGIN_VERSION });
+  const panelHtml = options.panelHtml ?? defaultPanelHtml;
 
   const register = <In extends z.ZodRawShape, Out extends z.ZodRawShape>(
     name: string,
@@ -66,6 +87,8 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
       input: In;
       output: Out;
       readOnly: boolean;
+      /** Route results to the workspace panel (W3-4): the host opens/refreshes the surface. */
+      panel?: boolean;
     },
     execute: (
       input: z.infer<z.ZodObject<In>>,
@@ -81,6 +104,11 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
           readOnlyHint: config.readOnly,
           destructiveHint: false,
           idempotentHint: config.readOnly,
+        },
+        _meta: {
+          ui: config.panel
+            ? { resourceUri: PANEL_URI, surface: SURFACE_ID, visibility: ['model', 'app'] }
+            : { visibility: ['model'] },
         },
       },
       (async (input: z.infer<z.ZodObject<In>>) => {
@@ -130,6 +158,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
       },
       output: { missionId: z.string(), researchMode: researchMode, brief: productBrief },
       readOnly: false,
+      panel: true,
     },
     async (input) => {
       const missionId =
@@ -198,6 +227,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
       },
       output: { competitors: z.array(competitorCandidate) },
       readOnly: false,
+      panel: true,
     },
     async (input) => {
       const { mission } = await runtime.open(input.missionId);
@@ -233,6 +263,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
         ingested: z.object({ ads: z.number(), organic: z.number(), metrics: z.number() }),
       },
       readOnly: false,
+      panel: true,
     },
     async (input) => {
       const { mission } = await runtime.open(input.missionId);
@@ -363,6 +394,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
         opportunities: z.array(z.object(opportunityScoreShape)),
       },
       readOnly: true,
+      panel: true,
     },
     async (input) => {
       const loaded = await runtime.open(input.missionId);
@@ -484,6 +516,7 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
         metrics: z.array(metricObservation),
       },
       readOnly: true,
+      panel: true,
     },
     async (input) => {
       const { mission } = await runtime.open(input.missionId);
@@ -520,6 +553,27 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
         structured: { ads, organic, metrics: metrics.slice(0, 200) },
       };
     },
+  );
+
+  // ---------------------------------------------------------------
+  // W3-4 — the workspace panel served as a ui:// resource. The host
+  // surface runtime loads it for the plugin's ui.surfaces entry; it is
+  // self-contained (no sibling asset reads) and stays far below the
+  // host's per-read budget. The panel talks to these same tools.
+  // ---------------------------------------------------------------
+  server.registerResource(
+    'panel',
+    PANEL_URI,
+    { mimeType: PANEL_MIME },
+    async () => ({
+      contents: [
+        {
+          uri: PANEL_URI,
+          mimeType: PANEL_MIME,
+          text: await panelHtml(),
+        },
+      ],
+    }),
   );
 
   return server;
