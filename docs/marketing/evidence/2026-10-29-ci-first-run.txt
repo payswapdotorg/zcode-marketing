@@ -122,3 +122,25 @@ upstream source and fixed hermetically:
   stays in the CI (harmless, documents the runner's exported env).
 
   RUN 4 (the fix commit) is the acceptance record for this evidence file.
+
+RUN 4 (e9dcc146, run 40917732095) — ACCEPTANCE: ALL FOUR CI JOBS GREEN
+======================================================================
+  governance      ✅  (lint / db:schema:check 8/8 / test:architecture 36/36 /
+                      architecture:check --changed with the push-base diff)
+  typecheck       ✅  (the FULL chain: 18-project tsc + remote-main + zcode-cua)
+  unit            ✅  — COMPLETE root unit suite: 2,052 test files passed, 2 skipped;
+                      19,936 tests passed | 21 skipped | 0 FAILED (the desktop mise PATH
+                      test that the 3GB sandbox could not satisfy PASSES on the runner's
+                      standard node layout; +82 tests over the W7-1 sandbox record from
+                      the later slice commits) + the three recorded plugin gates:
+                      bootstrap plugins.test.ts 47/47, adapters plugins.test.ts 79/79,
+                      marketing-plugin 10 files / 56 tests — all green in the same job.
+  desktop-e2e     ✅  — the upstream desktop ELECTRON suite in its own container,
+                      replay-isolated, 4/4 replay-admitted specs green (container-boot,
+                      smoke, e2ecase-regression, task-list-archive-confirmation);
+                      upstream-provider.test.ts stays the recorded credentials-gated
+                      manual path (capture-mode by design, needs a real provider key).
+
+This closes the last environment-dependent item recorded at W7 completion: the
+"CI-environment gate" for the desktop electron suite now has a remote, green,
+push-triggered home at .github/workflows/ci.yml on payswapdotorg/zcode-marketing.
