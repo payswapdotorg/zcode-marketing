@@ -1,0 +1,67 @@
+Environment incident + recovery record — 2026-10-29
+====================================================
+
+Session context: post-roadmap-completion session (W0..W7 all closed; HEAD on origin/main
+was 678f8de4, the governance-reconciliation hash-record commit).
+
+WHAT HAPPENED (detected ~15:35 UTC+8)
+- Mid-session, between a local plugin verification run (marketing-plugin vitest 56/56 at
+  13:59, dist artifacts present) and a later package listing, the sandbox workspace
+  /home/z/my-project/zcode was REPLACED by an environment-level snapshot restore: the
+  directory became a W0-era reconstruction — a fresh clone from
+  https://github.com/zai-org/zcode.git at the fork point 3c5b2276 with only the two
+  earliest marketing commits on top. The reflog of the replacement tree recorded:
+      960a3bb4 HEAD@{0}: commit: docs(marketing): record slice commit hash in WORK-REGISTRY change log
+      934e1e59 HEAD@{1}: commit: feat(marketing): W0 baseline, governance docs, and marketing domain layer vertical slice
+      3c5b2276 HEAD@{2}: clone: from https://github.com/zai-org/zcode.git
+- None of the W1–W7 commits existed in that local object store
+  (git cat-file -t 98ec0f8c / 0f5de6c5 / c2336f84 / 7faf2259 / 6753d978 / 78c30b07 →
+  "fatal: Not a valid object name").
+- The working tree of the replacement also carried ~18,266 externally-introduced
+  tracked-file modifications (snapshot artifacts, not lane work) and an empty node_modules.
+
+LOSS ASSESSMENT: ZERO WORK LOST
+- The completed state had been fully pushed to origin before the event (the standing
+  discipline: every slice is committed and pushed immediately, evidence lives in the
+  repo). Verified during the incident with the definitive test:
+      git ls-remote origin
+        678f8de4adba79e477e382aec7433479881cfabe  HEAD
+        678f8de4adba79e477e382aec7433479881cfabe  refs/heads/main
+        662c30bea4e833acaacbfb745a65eb09c23d55f8  refs/heads/feat/ui-plugin
+        7e7bd174...  refs/tags/v3.14.3   29628c9a...  refs/tags/v3.14.3^{}
+        9ab8a647...  refs/tags/v3.15.1   aac47556...  refs/tags/v3.15.1^{}
+  (an unauthenticated api.github.com call at the same moment returned only an IP rate-limit
+  notice for 47.57.242.119 — it was NOT a repo-deletion signal; git ls-remote is authoritative)
+
+RECOVERY (executed immediately)
+- git fetch origin && git reset --hard origin/main
+- Result: HEAD = 678f8de4; working tree clean (0 modified files);
+  apps/zcode-cli/packages/marketing-plugin present; 24 evidence files present.
+- node_modules was empty after the restore (not tracked by git); dependencies were
+  reinstalled with corepack pnpm install --frozen-lockfile (repo pin 10.33.2) before any
+  local gate or live verifier was re-run.
+
+ROOT CAUSE (assessed, honest)
+- Environment/sandbox infrastructure restoration, NOT a git operation by the work lane:
+  no destructive command ran between the last verified-good state and the detected
+  anomaly, and the replacement tree's own reflog records a *clone* event from the
+  upstream URL — the origin remote was then re-pointed at payswapdotorg/zcode-marketing
+  by the same restoration process.
+- The sandbox is treated as disposable; the repository of record is origin.
+
+DISCIPLINE CONFIRMED + HARDENING
+- The recorded rule "commit + push every slice immediately; the registry only accepts
+  evidence that exists in the repo" is what made this a non-event: the single source of
+  truth (origin) was intact and the local workspace was rebuilt from it in one command.
+- Hardening that follows directly: the release gates must also run somewhere that does
+  not share the dev sandbox's lifecycle. This push adds .github/workflows/ci.yml —
+  four jobs (governance / typecheck / unit / desktop-e2e) — giving the recorded
+  "CI-environment gate" (the upstream desktop ELECTRON E2E suite, not runnable in this
+  sandbox) a durable home on GitHub Actions. The first CI run's outcome is recorded in
+  the WORK-REGISTRY change log with this evidence file.
+
+Reproduce the recovery (for any future occurrence):
+  cd /home/z/my-project/zcode
+  git fetch origin && git reset --hard origin/main
+  corepack pnpm install --frozen-lockfile   # node_modules is not tracked
+  # verify: git log --oneline -3 ; git status --short ; ls docs/marketing/evidence | wc -l

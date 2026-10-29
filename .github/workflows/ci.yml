@@ -1,0 +1,128 @@
+# CI — the release-environment gates this repository records in its governance docs.
+#
+# Why these four jobs exist (traceable to docs/marketing/*):
+#   - governance   : lint / db schema / architecture governance (the `verify:pre-push` static half)
+#   - typecheck    : the FULL tsc project chain (18 projects + remote-main + zcode-cua)
+#   - unit         : the COMPLETE root unit suite (the 19,854-test gate from the W7-1 record)
+#                    plus the zcode-cli turbo test chains (marketing-plugin / bootstrap / adapters)
+#   - desktop-e2e  : the upstream desktop ELECTRON suite in its container, replay-isolated —
+#                    the recorded "CI-environment gate" that cannot run in dev sandboxes
+#                    (no electron bundle / no display); this job is its home.
+#
+# Live connector verification (real public ad/organic endpoints) is deliberately NOT part of
+# default CI: it depends on external network behavior and is recorded as dated evidence files
+# under docs/marketing/evidence/ instead (see MARKETING-DATA-SOURCES.md).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HUSKY: "0"
+
+jobs:
+  governance:
+    name: governance (lint / schema / architecture)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve diff base for changed-scope checks
+        id: diffbase
+        run: |
+          set -euo pipefail
+          base=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+            || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"
+          fi
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+          echo "diff base: $base"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run db:schema:check
+      - run: pnpm run test:architecture
+      - run: pnpm run architecture:check -- --changed
+        env:
+          ARCHITECTURE_BASE: ${{ steps.diffbase.outputs.sha }}
+
+  typecheck:
+    name: typecheck (full tsc chain)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+  unit:
+    name: unit (complete root suite + cli plugin chains)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Repo convention: plugin dists are build products and the bootstrap seed tests read
+      # them (turbo `test` dependsOn `build`); build first so the root suite sees dists.
+      - run: pnpm --dir apps/zcode-cli build
+      - run: pnpm run test:unit
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+      - run: pnpm --dir apps/zcode-cli test
+
+  desktop-e2e:
+    name: desktop e2e (electron, container, replay-isolated)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the desktop E2E container suite
+        run: bash scripts/test-desktop-e2e-container.sh
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-e2e-artifacts
+          path: packages/desktop/.e2e-artifacts/
+          if-no-files-found: ignore
