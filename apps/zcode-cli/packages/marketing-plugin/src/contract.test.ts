@@ -60,6 +60,8 @@ describe("marketing-plugin contract", () => {
             dir: ".zcode/marketing",
             missionIndex: MARKETING_MISSIONS_INDEX,
             missionDb: ".zcode/marketing/missions/<missionId>.sqlite",
+            missionArtifacts: ".zcode/marketing/missions/<missionId>-artifacts.json",
+            missionAssets: ".zcode/marketing/missions/<missionId>/assets/",
           },
           modelChannel: {
             provenancePrefix: "zcode:routed:",

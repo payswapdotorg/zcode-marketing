@@ -28,24 +28,16 @@ import {
 } from '@zcode/marketing';
 import type { OpportunityScore } from '@zcode/marketing';
 import { MarketingRuntime, MarketingToolError, missionIndexEntry, researchMode } from './runtime.js';
+import { SERVER_NAME, PLUGIN_VERSION, PANEL_URI, PANEL_MIME } from './serverConstants.js';
+import { createRegistrar } from './toolRegistrar.js';
+import { registerW4Tools } from './w4Tools.js';
 
-export const PLUGIN_NAME = 'marketing';
-export const PLUGIN_VERSION = '0.3.0';
-export const SERVER_NAME = 'marketing';
-
-/** W3-4: the workspace panel served as a ui:// resource (office-panel pattern). */
-export const PANEL_URI = 'ui://marketing/panel.html';
-export const PANEL_MIME = 'text/html;profile=mcp-app';
-export const SURFACE_ID = 'marketing';
+// Re-exported for the contract tests (import surface unchanged since W3-1).
+export { PLUGIN_NAME, PLUGIN_VERSION, SERVER_NAME, PANEL_URI, PANEL_MIME, SURFACE_ID } from './serverConstants.js';
 
 /** Resolves dist/panel.html next to the built server entry (dist/server.mjs). */
 const defaultPanelHtml = async (): Promise<string> =>
   readFile(join(dirname(fileURLToPath(import.meta.url)), 'panel.html'), 'utf8');
-
-const textResult = (text: string, structuredContent?: Record<string, unknown>) => ({
-  content: [{ type: 'text' as const, text }],
-  ...(structuredContent ? { structuredContent } : {}),
-});
 
 export interface MarketingServerOptions {
   /** Injectable for tests; default reads dist/panel.html next to the server entry. */
@@ -80,60 +72,7 @@ export function createMarketingServer(
   const server = new McpServer({ name: SERVER_NAME, version: PLUGIN_VERSION });
   const panelHtml = options.panelHtml ?? defaultPanelHtml;
 
-  const register = <In extends z.ZodRawShape, Out extends z.ZodRawShape>(
-    name: string,
-    config: {
-      description: string;
-      input: In;
-      output: Out;
-      readOnly: boolean;
-      /** Route results to the workspace panel (W3-4): the host opens/refreshes the surface. */
-      panel?: boolean;
-    },
-    execute: (
-      input: z.infer<z.ZodObject<In>>,
-    ) => Promise<{ text: string; structured: z.infer<z.ZodObject<Out>> }>,
-  ) => {
-    server.registerTool(
-      name,
-      {
-        description: config.description,
-        inputSchema: config.input,
-        outputSchema: config.output,
-        annotations: {
-          readOnlyHint: config.readOnly,
-          destructiveHint: false,
-          idempotentHint: config.readOnly,
-        },
-        _meta: {
-          ui: config.panel
-            ? { resourceUri: PANEL_URI, surface: SURFACE_ID, visibility: ['model', 'app'] }
-            : { visibility: ['model'] },
-        },
-      },
-      (async (input: z.infer<z.ZodObject<In>>) => {
-        try {
-          const { text, structured } = await execute(input);
-          return textResult(text, structured as Record<string, unknown>);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          const code =
-            error instanceof z.ZodError
-              ? 'invalid_input'
-              : error instanceof MarketingToolError
-                ? error.code
-                : 'marketing_failure';
-          if (code === 'marketing_failure') {
-            process.stderr.write(`[${SERVER_NAME}] ${name}: ${String(error)}\n`);
-          }
-          return {
-            isError: true,
-            ...textResult(`[${code}] ${message}`, { error: { code, message } }),
-          };
-        }
-      }) as never,
-    );
-  };
+  const register = createRegistrar(server);
 
   // ---------------------------------------------------------------
   // Onboarding — the user describes a product, chooses a platform.
@@ -360,6 +299,12 @@ export function createMarketingServer(
       const adFeatures = await runtime.extractFeatures(loaded, mission.store.allAds());
       const organicFeatures = await runtime.extractFeatures(loaded, mission.store.allOrganic());
       const opportunities: OpportunityScore[] = await mission.rankOpportunities(adFeatures, organicFeatures);
+      // W4: persist the ranked hypotheses so a creative draft can reference
+      // the exact opportunity by id, across processes.
+      await runtime.saveHypotheses(
+        input.missionId,
+        opportunities.map((o) => o.hypothesis),
+      );
       const text = [
         `Ranked opportunities (${input.missionId}) — scores are SEPARATED, never blended:`,
         ...opportunities.map(
@@ -414,6 +359,11 @@ export function createMarketingServer(
         const organicFeatures = await runtime.extractFeatures(loaded, mission.store.allOrganic());
         extractionModelRefs = [...new Set([...adFeatures, ...organicFeatures].map((f) => f.extractionModelRef))];
         opportunities = await mission.rankOpportunities(adFeatures, organicFeatures);
+        // W4: hypotheses persist with the mission so drafts can cite them.
+        await runtime.saveHypotheses(
+          input.missionId,
+          opportunities.map((o) => o.hypothesis),
+        );
         opportunityNote = '';
       }
       const syntheticNote =
@@ -554,6 +504,9 @@ export function createMarketingServer(
       };
     },
   );
+
+  // W4 creative handoff tools (same registrar contract).
+  registerW4Tools(register, runtime);
 
   // ---------------------------------------------------------------
   // W3-4 — the workspace panel served as a ui:// resource. The host

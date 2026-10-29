@@ -1,0 +1,88 @@
+================================================================================
+W4 — Creative strategy and production handoff: full-chain evidence run
+Date: 2026-10-29 08:47 UTC  ·  exit code: 0  ·  31 gates
+Reproduce: pnpm --filter @zcode/marketing-plugin demo:w4
+Server: real spawned stdio process (dist/server.mjs); model port: labeled heuristic stand-in
+(no host sampling capability in this harness — provenance stamps the fallback);
+browser-level handoff: evidence/2026-10-29-w3-4-panel-e2e.txt (W4 gates 7-9).
+Regression this wave: demo:loop + demo:sqlite ALL GATES PASSED; w3-chain 19/19.
+================================================================================
+
+Connected to marketing MCP server (/home/z/my-project/zcode/apps/zcode-cli/packages/marketing-plugin/dist/server.mjs)
+Workspace: /tmp/w4-chain-m4Zal7
+
+
+== 1. mission start + discovery + research + rank (W3 chain, demo mode) ==
+  ✔ ranked opportunities produced (hypotheses persisted with ids)
+  top hypothesis: hypothesis-8
+
+== 2. marketing_draft_creative (the W4 production handoff pack) ==
+  ✔ handoff pack drafted and persisted (review status)
+  ✔ pack is a review-status prompt pack
+  ✔ timed script: 4 beats
+  ✔ opening beat lands within 3 seconds
+  ✔ video-gen prompt pack present
+  ✔ thumbnail prompt pack present
+  ✔ copy variants present
+  ✔ experiment spec bound to the objective metric
+  ✔ drafting provenance recorded
+Creative handoff pack drafted (artifact-9) for hypothesis hypothesis-8:
+- angle: show the product delivering the promised benefit in the first 3 seconds
+- hook: "creator-led personal benefit reveal" | format: 9:16 creator demo, 30s
+- drafted by: heuristic:reasoner (fallback: host did not declare the sampling capability) (routing provenance recorded in the artifact)
+
+The pack contains the timed script (4 beats), storyboard, video-gen + thumbnail prompt packs,
+copy variants and the experiment spec. Review it in the Marketing panel or with
+marketing_list_artifacts; approve with marketing_review_artifact before producing/publishing.
+
+== 3. marketing_review_artifact (explicit approval) ==
+  ✔ approval records reviewer and flips status
+  ✔ double-approval refused (invalid transition)
+
+== 4. marketing_asset_import_begin/write/finish (bring the produced file back) ==
+  ✔ import session begun
+  ✔ import finished with declared byte count verified
+  ✔ file stored under the mission workspace (relative path)
+Import complete: launch-ad-v1.mp4 (38 bytes) at .zcode/marketing/missions/mission-w4-chain/assets/asset-1-1793263637531-launch-ad-v1.mp4. Record it against an artifact with marketing_record_asset.
+  ✔ byte-count mismatch aborts the import
+
+== 5. marketing_record_asset (declaration + versioned rubric) ==
+  ✔ asset recorded against the approved pack
+  ✔ rubric version travels with the report
+  ✔ clean declaration passes every machine aspect
+  ✔ imported file verified by the rubric
+  ✔ qualitative provenance recorded (assessedBy)
+Asset recorded (asset-artifact-9-1793263637538) against artifact artifact-9, hypothesis hypothesis-8.
+Rubric v1: verdict 'ready', score 1 — 0 blocking, 0 to review.
+- [pass] opening-benefit: opening present (9 words)
+- [pass] product-accuracy: product mentioned; offer words partially present (4 absent) — confirm the offer reads accurately
+- [pass] proof-present: proof element declared
+- [pass] cta-objective: CTA matches the 'sales' objective
+- [pass] platform-tech: format/aspect/duration fit youtube
+- [pass] claims-honesty: 0 superlative(s), 1 substantiation marker(s)
+- [pass] brand-constraint:no discount-first messaging: no discount-style language found (constraint: "no discount-first messaging")
+- [pass] competitor-trademarks: no tracked competitor names in the copy
+- [pass] file-present: imported file recorded: launch-ad-v1.mp4 (19 bytes)
+
+Qualitative assessment provenance: heuristic:reasoner (fallback: host did not declare the sampling capability).
+Review the warnings, then approve or reject with marketing_review_artifact.
+  ✔ discount copy against the constrained brief is rubric-blocked
+
+== 6. marketing_compare_assets (honest comparison) ==
+  ✔ comparison produced
+  ✔ both recorded assets compared
+  ✔ ready vs blocked outcomes side by side
+Asset comparison (mission-w4-chain):
+- asset-artifact-9-1793263637538 [hypothesis hypothesis-8] rubric ready (1) — 0 fail / 0 warn; signal: no observable metric for objective 'sales' — signal unavailable, not invented
+- asset-artifact-9-1793263637540 [hypothesis hypothesis-8] rubric blocked (0.78) — 1 fail / 2 warn; signal: no observable metric for objective 'sales' — signal unavailable, not invented
+
+Rubric verdicts compare validation quality; performance signals (when present) are objective-appropriate. Choose the asset to publish with marketing_review_artifact + publishing (W5).
+
+== 7. persistence: fresh server process reads the creative state ==
+  ✔ creative state readable after restart
+  ✔ hypothesis ids stable across processes
+  ✔ approved pack persisted
+  ✔ both recorded assets persisted
+  ✔ drafting by persisted hypothesis id works after restart
+  ✔ artifacts file is the canonical persisted state
+

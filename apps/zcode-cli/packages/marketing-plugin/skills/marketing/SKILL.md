@@ -62,13 +62,41 @@ non-negotiable.
 The plugin ships a branded Marketing panel (`ui://marketing/panel.html`, the
 office-panel convention): mission list, onboarding form, competitor discovery
 and confirmation, one-click idempotent research, the honest coverage report,
-performance signals, ranked opportunities with separated scores, and the full
-evidence trail with provenance. Panel-routed tools (`marketing_mission_start`,
-`marketing_discover_competitors`, `marketing_research_platform`,
-`marketing_mission_report`, `marketing_evidence_view`) declare
-`_meta.ui.resourceUri` so the host forwards their results to the surface — the
-panel refreshes as you work. The panel calls the same tools you do; there is no
-parallel data path.
+performance signals, ranked opportunities with separated scores, the full
+evidence trail with provenance, and (W4) the Creative tab — hypotheses with
+"Draft handoff pack", the pack cards (timed script, storyboard, prompt packs,
+experiment spec), explicit approve/reject, the bring-back form (chunked file
+import + declaration) with the versioned rubric report. Panel-routed tools
+declare `_meta.ui.resourceUri` so the host forwards their results to the
+surface — the panel refreshes as you work. The panel calls the same tools you
+do; there is no parallel data path.
+
+## Creative handoff (W4)
+
+After `marketing_rank_opportunities` (hypotheses persist with stable ids):
+
+1. **Draft** — `marketing_draft_creative` (omit hypothesisId for the top
+   opportunity). Produces the production pack: creative brief, timed 4-beat
+   script, storyboard, generator-specific prompt packs (video-gen + thumbnail
+   + copy variants), and the testable experiment spec (metric + window +
+   changed variables). Provenance recorded (`brief.draftedBy`).
+2. **Review** — `marketing_review_artifact` with an explicit `decision`
+   (approve/reject) and `reviewedBy`. Nothing auto-approves; double transitions
+   are refused. Publishing (W5) requires an approved artifact.
+3. **Produce** — the user takes the prompt packs into their creative platform.
+4. **Bring back** — `marketing_asset_import_begin/write/finish` (chunked; the
+   file lands under `.zcode/marketing/missions/<id>/assets/`) then
+   `marketing_record_asset` with the declaration of what the asset contains
+   (opening/hook, proof, CTA, transcript/copy, format/duration/aspect). The
+   versioned rubric (`v1`) runs: deterministic rule checks (opening-benefit,
+   product-accuracy, proof-present, cta-objective, platform-tech,
+   claims-honesty, brand-constraints incl. discount/trademark scans,
+   file-present) + the routed qualitative assessment — provenance in
+   `rubric.assessedBy`. The rubric SUGGESTS corrections; it never edits the
+   creative or approves anything. A blocked verdict (any fail) should be fixed
+   before approval; state that honestly to the user.
+5. **Compare** — `marketing_compare_assets` for the side-by-side rubric
+   verdicts across recorded assets before choosing what to publish.
 
 ## Honesty rules
 

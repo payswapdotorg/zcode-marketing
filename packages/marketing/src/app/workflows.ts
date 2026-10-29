@@ -28,6 +28,7 @@ import type {
   OrganicContent,
   ProductBrief,
 } from '../domain/records.js';
+import { buildRubricReport } from './rubric.js';
 import type { CapabilityCatalog } from './capabilityCatalog.js';
 import type { MarketingConnector } from './ports.js';
 import { TemporalStore } from './temporalStore.js';
@@ -320,10 +321,44 @@ export class MarketingMission {
     });
   }
 
-  /** Creative brief + generator prompt pack + experiment spec (one artifact). */
+  /**
+   * W4 creative handoff: the full production pack for a hypothesis — creative
+   * brief, timed script, storyboard beats, generator-specific prompt packs
+   * (video-gen / thumbnail / copy variants), and the testable experiment spec.
+   * Routed through `draftBrief` when a model is available (provenance recorded
+   * in brief.draftedBy); the labeled heuristic produces the same shape.
+   */
   async draftCreative(hypothesis: z.infer<typeof creativeHypothesis>): Promise<z.infer<typeof creativeArtifact>> {
-    const { value, routing } = await this.catalog.runRouted('draftBrief', { hypothesis: hypothesis.pattern }, z.unknown());
-    const briefCore = (value ?? {}) as Record<string, unknown>;
+    const scriptSchema = z.object({
+      beats: z
+        .array(
+          z.object({
+            startSec: z.number(),
+            endSec: z.number(),
+            line: z.string().min(1),
+            visual: z.string().min(1),
+            onScreenText: z.string().optional(),
+          }),
+        )
+        .min(2),
+      thumbnailPrompt: z.string().min(1),
+      titleVariants: z.array(z.string().min(1)).min(2),
+      ctaLine: z.string().min(1),
+    });
+    const { value, routing } = await this.catalog.runRouted('draftBrief', {
+      hypothesis: hypothesis.pattern,
+      objective: this.brief.objective,
+      product: this.brief.product,
+      audience: this.brief.audience,
+      offer: this.brief.offer,
+      constraints: this.brief.constraints ?? [],
+    }, scriptSchema);
+    const timedBeats = (value.beats.length === 4 ? value.beats : [
+      { startSec: 0, endSec: 3, line: hypothesis.pattern.hook, visual: 'creator-led opening with the benefit reveal', onScreenText: value.beats[0]?.onScreenText },
+      { startSec: 3, endSec: 15, line: value.beats[1]?.line ?? `demonstrate ${hypothesis.pattern.demonstration}`, visual: value.beats[1]?.visual ?? 'in-use demonstration, handheld creator footage' },
+      { startSec: 15, endSec: 25, line: value.beats[2]?.line ?? 'show the proof moment', visual: value.beats[2]?.visual ?? 'side-by-side before/after within creator context' },
+      { startSec: 25, endSec: 30, line: value.beats[3]?.line ?? value.ctaLine, visual: value.beats[3]?.visual ?? 'product close-up with single CTA overlay' },
+    ]).map((beat) => ({ ...beat, onScreenText: beat.onScreenText ?? '' }));
     return creativeArtifact.parse({
       kind: 'CreativeArtifact',
       id: nextId('artifact'),
@@ -337,18 +372,31 @@ export class MarketingMission {
           audience: this.brief.audience,
           angle: hypothesis.pattern.message,
           why: 'evidence-backed paid×organic intersection (see hypothesis)',
+          hypothesisId: hypothesis.id,
+          predictedOutcome: hypothesis.predictedOutcome,
         },
         blueprint: {
           hook: hypothesis.pattern.hook,
-          storyboard: [briefCore, 'storyboard' in briefCore ? briefCore.storyboard : ['creator-led opening', 'product demo', 'proof', 'cta']],
+          format: hypothesis.pattern.format,
+          demonstration: hypothesis.pattern.demonstration,
           cta: hypothesis.pattern.cta,
           pacing: 'fast-open, proof-middle, single cta close',
         },
-        generatorPromptPack: {
-          durationSec: 30,
-          aspectRatio: '9:16',
-          prompt: `Hook: ${hypothesis.pattern.hook}; Demonstration: ${hypothesis.pattern.demonstration}; CTA: ${hypothesis.pattern.cta}`,
-          negativeConstraints: ['no unsubstantiated claims', 'no competitor trademarks'],
+        script: timedBeats,
+        storyboard: timedBeats.map((beat) => ({
+          beat: `${beat.startSec}-${beat.endSec}s`,
+          visual: beat.visual,
+          ...(beat.onScreenText ? { onScreenText: beat.onScreenText } : {}),
+        })),
+        generatorPromptPacks: {
+          videoGen: {
+            prompt: `Hook: ${hypothesis.pattern.hook}; Demonstration: ${hypothesis.pattern.demonstration}; CTA: ${hypothesis.pattern.cta}`,
+            negativeConstraints: ['no unsubstantiated claims', 'no competitor trademarks', ...(this.brief.constraints ?? [])],
+            durationSec: 30,
+            aspectRatio: hypothesis.pattern.format.includes('9:16') ? '9:16' : '16:9',
+          },
+          thumbnail: { prompt: value.thumbnailPrompt, textOverlay: hypothesis.pattern.hook },
+          copy: { titleVariants: value.titleVariants, ctaLine: value.ctaLine },
         },
         experimentSpec: {
           hypothesisId: hypothesis.id,
@@ -360,6 +408,33 @@ export class MarketingMission {
         draftedBy: routing.executedModelRef,
       },
       promptPack: {},
+    });
+  }
+
+  /**
+   * W4 asset validation: the machine rubric (deterministic rule checks) plus
+   * the routed qualitative assessment (`validateAsset` task) with provenance.
+   * Suggests corrections; never edits the creative or auto-approves anything.
+   */
+  async validateAsset(input: {
+    declaration: import('./rubric.js').AssetDeclaration;
+    competitors: CompetitorCandidate[];
+  }): Promise<import('./rubric.js').RubricReport> {
+    const schema = z.object({
+      verdict: z.enum(['ready', 'needs-review', 'blocked']),
+      issues: z.array(z.object({ aspect: z.string(), message: z.string(), suggestion: z.string().optional() })),
+    });
+    const { value, routing } = await this.catalog.runRouted('validateAsset', {
+      objective: this.brief.objective,
+      product: this.brief.product,
+      offer: this.brief.offer,
+      declaration: input.declaration,
+    }, schema);
+    return buildRubricReport({
+      declaration: input.declaration,
+      brief: this.brief,
+      competitors: input.competitors,
+      qualitative: { issues: value.issues, executedModelRef: routing.executedModelRef },
     });
   }
 

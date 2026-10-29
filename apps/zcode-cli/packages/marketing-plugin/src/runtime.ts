@@ -10,7 +10,7 @@
  * Layering: `@zcode/marketing` public entrypoint only. All file I/O lives here
  * (adapters-equivalent boundary of the plugin), never in domain code.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, open, unlink, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import {
@@ -24,13 +24,17 @@ import {
   GoogleAdsTransparencyConnector,
   competitorCandidate,
   coverageReport,
+  creativeArtifact,
+  creativeHypothesis,
   productBrief,
 } from '@zcode/marketing';
 import type {
   AdCreative,
   CompetitorCandidate,
   ConnectorMeta,
+  CreativeArtifact,
   CreativeFeatureSet,
+  CreativeHypothesis,
   MarketingConnector,
   ModelPort,
   OrganicContent,
@@ -63,12 +67,28 @@ const missionIndexFile = z.object({
   missions: z.array(missionIndexEntry),
 });
 
+/**
+ * W4 persisted creative state: ranked hypotheses (so a draft can reference the
+ * exact opportunity the user picked, by id, across processes) and the creative
+ * artifacts (prompt packs, uploaded assets + their rubric reports).
+ */
+export const missionArtifactsFile = z.object({
+  kind: z.literal('marketing-mission-artifacts'),
+  version: z.literal(1),
+  missionId: z.string().min(1),
+  hypotheses: z.array(creativeHypothesis).default([]),
+  artifacts: z.array(creativeArtifact).default([]),
+});
+export type MissionArtifactsFile = z.infer<typeof missionArtifactsFile>;
+
 export interface LoadedMission {
   entry: MissionIndexEntry;
   mission: MarketingMission;
   connector: MarketingConnector;
   /** Temporal store handle kept open between tool calls; closed on runtime close. */
   store: TemporalStorePort;
+  /** W4 creative state (hypotheses + artifacts), mirrored to a per-mission JSON file. */
+  artifacts: MissionArtifactsFile;
   /**
    * Per-subject creative-feature cache (W3-3). Observed subject records are
    * immutable (same id = same content), so re-running model extraction on every
@@ -153,9 +173,22 @@ export interface RuntimeOptions {
   transparencyFetchLike?: TransparencyFetchLike;
 }
 
+/** One in-flight chunked asset import (W4): the panel streams base64 chunks. */
+interface ImportSession {
+  id: string;
+  missionId: string;
+  name: string;
+  declaredBytes: number;
+  received: number;
+  handle: import('node:fs/promises').FileHandle;
+  path: string;
+}
+
 export class MarketingRuntime {
   private readonly dir: string;
   private readonly loaded = new Map<string, LoadedMission>();
+  private readonly imports = new Map<string, ImportSession>();
+  private importCounter = 0;
   /** Late-bound host sampling channel (W3-2): set by main() after the MCP
    * initialize handshake when the host declared the `sampling` capability. */
   private sampling?: SamplingClient;
@@ -262,9 +295,182 @@ export class MarketingRuntime {
       this.now,
       store,
     );
-    const loaded: LoadedMission = { entry, mission, connector, store, featureCache: new Map() };
+    const artifacts = await this.readArtifacts(missionId);
+    const loaded: LoadedMission = { entry, mission, connector, store, artifacts, featureCache: new Map() };
     this.loaded.set(missionId, loaded);
     return loaded;
+  }
+
+  /** W4: per-mission creative state file (hypotheses + artifacts). */
+  private async readArtifacts(missionId: string): Promise<MissionArtifactsFile> {
+    try {
+      const raw = JSON.parse(await readFile(join(this.dir, 'missions', `${missionId}-artifacts.json`), 'utf8'));
+      return missionArtifactsFile.parse(raw);
+    } catch {
+      return { kind: 'marketing-mission-artifacts', version: 1, missionId, hypotheses: [], artifacts: [] };
+    }
+  }
+
+  private async writeArtifacts(loaded: LoadedMission): Promise<void> {
+    await mkdir(join(this.dir, 'missions'), { recursive: true });
+    await writeFile(
+      join(this.dir, 'missions', `${loaded.entry.missionId}-artifacts.json`),
+      JSON.stringify(loaded.artifacts, null, 2),
+    );
+  }
+
+  /** Persists ranked hypotheses (id-stable across processes so drafts can cite them).
+   *
+   * Content-dedupe: rank/report both regenerate hypotheses on every call; the
+   * same evidence-backed pattern keeps its original id instead of piling up
+   * near-duplicates (pattern message+hook+format+cta+predicted outcome is the
+   * identity). Drafts reference ids; ids must stay stable for the same idea. */
+  async saveHypotheses(missionId: string, hypotheses: CreativeHypothesis[]): Promise<void> {
+    const loaded = await this.open(missionId);
+    const patternKey = (h: CreativeHypothesis): string =>
+      JSON.stringify([
+        h.pattern.problem,
+        h.pattern.message,
+        h.pattern.hook,
+        h.pattern.format,
+        h.pattern.demonstration,
+        h.pattern.cta,
+        h.predictedOutcome.metricKey,
+        h.predictedOutcome.low,
+        h.predictedOutcome.expected,
+        h.predictedOutcome.high,
+      ]);
+    const known = new Map(loaded.artifacts.hypotheses.map((h) => [patternKey(h), h] as const));
+    for (const hypothesis of hypotheses) {
+      const key = patternKey(hypothesis);
+      const existing = known.get(key);
+      if (existing) {
+        // Keep the stable id; refresh the volatile fields (confidence, refs).
+        known.set(key, { ...hypothesis, id: existing.id });
+      } else {
+        known.set(key, hypothesis);
+      }
+    }
+    loaded.artifacts.hypotheses = [...known.values()];
+    await this.writeArtifacts(loaded);
+  }
+
+  async findHypothesis(missionId: string, hypothesisId: string): Promise<CreativeHypothesis> {
+    const loaded = await this.open(missionId);
+    const hypothesis = loaded.artifacts.hypotheses.find((h) => h.id === hypothesisId);
+    if (!hypothesis) {
+      throw new MarketingToolError(
+        'unknown_hypothesis',
+        `mission '${missionId}' has no hypothesis '${hypothesisId}' — run marketing_rank_opportunities first, then reference the hypothesis id it returned`,
+      );
+    }
+    return hypothesis;
+  }
+
+  /** Adds or updates a creative artifact (prompt packs, uploaded assets). */
+  async saveArtifact(missionId: string, artifact: CreativeArtifact): Promise<void> {
+    const loaded = await this.open(missionId);
+    const next = loaded.artifacts.artifacts.filter((a) => a.id !== artifact.id);
+    next.push(artifact);
+    loaded.artifacts.artifacts = next;
+    await this.writeArtifacts(loaded);
+  }
+
+  async getArtifact(missionId: string, artifactId: string): Promise<CreativeArtifact> {
+    const loaded = await this.open(missionId);
+    const artifact = loaded.artifacts.artifacts.find((a) => a.id === artifactId);
+    if (!artifact) {
+      throw new MarketingToolError(
+        'unknown_artifact',
+        `mission '${missionId}' has no artifact '${artifactId}' — call marketing_draft_creative (or import an asset) first`,
+      );
+    }
+    return artifact;
+  }
+
+  // -------------------------------------------------------------------------
+  // W4 chunked asset import (office begin/write/finish convention, app-only
+  // visibility): the panel streams the produced file into the mission
+  // workspace so the mission holds the actual asset, not just a declaration.
+  // -------------------------------------------------------------------------
+  async beginAssetImport(input: { missionId: string; name: string; size: number }): Promise<{ id: string }> {
+    const loaded = await this.open(input.missionId);
+    void loaded;
+    const safe = input.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
+    if (safe.length === 0) throw new MarketingToolError('invalid_input', 'asset name is empty after sanitization');
+    if (input.size <= 0 || input.size > 512 * 1024 * 1024) {
+      throw new MarketingToolError('invalid_input', 'asset size must be between 1 byte and 512 MiB');
+    }
+    const id = `asset-${(this.importCounter += 1)}-${Date.now()}`;
+    const dir = join(this.dir, 'missions', input.missionId, 'assets');
+    await mkdir(dir, { recursive: true });
+    const path = join(dir, `${id}-${safe}`);
+    const handle = await open(path, 'wx');
+    this.imports.set(id, {
+      id,
+      missionId: input.missionId,
+      name: safe,
+      declaredBytes: input.size,
+      received: 0,
+      handle,
+      path,
+    });
+    return { id };
+  }
+
+  async writeAssetChunk(id: string, offset: number, base64: string): Promise<void> {
+    const session = this.imports.get(id);
+    if (!session) throw new MarketingToolError('unknown_import', `no asset import in progress '${id}'`);
+    const chunk = Buffer.from(base64, 'base64');
+    if (chunk.byteLength === 0) throw new MarketingToolError('invalid_input', 'empty chunk');
+    await session.handle.write(chunk, offset);
+    session.received += chunk.byteLength;
+  }
+
+  async finishAssetImport(id: string): Promise<{ name: string; bytes: number; path: string }> {
+    const session = this.imports.get(id);
+    if (!session) throw new MarketingToolError('unknown_import', `no asset import in progress '${id}'`);
+    if (session.received !== session.declaredBytes) {
+      await session.handle.close();
+      await unlink(session.path).catch(() => undefined);
+      this.imports.delete(id);
+      throw new MarketingToolError(
+        'invalid_input',
+        `import '${id}' declared ${session.declaredBytes} bytes but received ${session.received} — import aborted, retry from begin`,
+      );
+    }
+    await session.handle.close();
+    this.imports.delete(id);
+    return {
+      name: session.name,
+      bytes: session.received,
+      // Workspace-relative so it never leaks an absolute host path into records.
+      path: session.path.split('.zcode').pop()!.replace(/^\//, '.zcode/'),
+    };
+  }
+
+  /** Resolves a completed import's stored file by import id (record step). */
+  async resolveImportedAsset(
+    missionId: string,
+    importedAssetId: string,
+  ): Promise<{ name: string; bytes: number; path: string }> {
+    const dir = join(this.dir, 'missions', missionId, 'assets');
+    const entries = await readdir(dir).catch(() => [] as string[]);
+    const match = entries.find((name) => name.startsWith(`${importedAssetId}-`));
+    if (!match) {
+      throw new MarketingToolError(
+        'unknown_import',
+        `no imported asset '${importedAssetId}' in mission '${missionId}' — complete a marketing_asset_import_begin/write/finish chain first`,
+      );
+    }
+    const absolute = join(dir, match);
+    const info = await stat(absolute);
+    return {
+      name: match.slice(importedAssetId.length + 1),
+      bytes: info.size,
+      // Workspace-relative so records never leak absolute host paths.
+      path: absolute.split('.zcode').pop()!.replace(/^\//, '.zcode/'),
+    };
   }
 
   async start(input: { missionId: string; brief: ProductBrief; researchMode: ResearchMode }): Promise<MissionIndexEntry> {
@@ -331,6 +537,11 @@ export class MarketingRuntime {
   }
 
   async close(): Promise<void> {
+    for (const session of this.imports.values()) {
+      await session.handle.close().catch(() => undefined);
+      await unlink(session.path).catch(() => undefined);
+    }
+    this.imports.clear();
     for (const m of this.loaded.values()) {
       await (m.store as unknown as { close?: () => void }).close?.();
     }

@@ -115,10 +115,38 @@ export class HeuristicModel implements ModelPort {
       }
       case 'scoreOpportunity':
         return { score: 0.72, rationale: 'cross-source support from paid duration signal + organic velocity' };
-      case 'draftBrief':
-        return { storyboard: ['creator-led opening with benefit reveal', 'in-use demonstration', 'proof moment', 'single CTA'] };
-      case 'validateAsset':
+      case 'draftBrief': {
+        // W4 handoff pack shape (deterministic): timed beats, thumbnail prompt,
+        // title variants, CTA line — derived strictly from the hypothesis input.
+        const req = input as {
+          hypothesis?: { hook?: string; demonstration?: string; cta?: string };
+          product?: string;
+          ctaLine?: string;
+        };
+        const hook = req.hypothesis?.hook ?? 'creator-led personal benefit reveal';
+        const demo = req.hypothesis?.demonstration ?? 'side-by-side before/after within creator context';
+        const cta = req.hypothesis?.cta ?? 'single low-friction CTA aligned with objective';
+        return {
+          beats: [
+            { startSec: 0, endSec: 3, line: hook, visual: 'creator-facing camera, benefit stated immediately', onScreenText: hook.slice(0, 40) },
+            { startSec: 3, endSec: 15, line: `Watch what happens when ${req.product ?? 'the product'} does the work`, visual: 'handheld in-use demonstration, jump cuts' },
+            { startSec: 15, endSec: 25, line: 'the proof moment, unedited', visual: demo },
+            { startSec: 25, endSec: 30, line: cta, visual: 'product close-up with single CTA overlay', onScreenText: cta.slice(0, 40) },
+          ],
+          thumbnailPrompt: `close-up of ${req.product ?? 'the product'} mid-use, expressive creator face, high contrast, no text clutter`,
+          titleVariants: [
+            `I tested ${req.product ?? 'this'} so you don't have to`,
+            `The honest ${req.product ?? 'product'} demo`,
+          ],
+          ctaLine: cta,
+        };
+      }
+      case 'validateAsset': {
+        // Deterministic stand-in: no qualitative issues manufactured — the
+        // machine rubric's deterministic checks carry the validation; the
+        // heuristic verdict is neutral so nothing is overstated.
         return { verdict: 'needs-review', issues: [] };
+      }
       default:
         throw new Error(`heuristic model cannot perform ${task}`);
     }

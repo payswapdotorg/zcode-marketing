@@ -19,7 +19,7 @@
 // Run: pnpm --filter @zcode/marketing-plugin demo:w3-4
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -247,22 +247,9 @@ try {
     .waitFor({ timeout: 15000 });
   gate("agent-tool-result-refreshes-panel", true, "mission list updated from a forwarded tool result, no panel action");
 
-  // The panel scrolls inside the iframe, so a plain fullPage shot of the host
-  // page still crops to the viewport. Expand the frame (same-origin iframe) so
-  // the whole report lays out without internal scrolling, then capture.
-  await outer.evaluate(() => {
-    const frame = document.querySelector("iframe");
-    const doc = frame.contentDocument;
-    const scroller = doc.querySelector(".main");
-    const wanted = scroller
-      ? scroller.scrollHeight + scroller.offsetTop + 40
-      : doc.body.scrollHeight + 40;
-    frame.style.height = `${Math.max(wanted, 900)}px`;
-  });
-  await shotFull("05-agent-push-refreshed.png");
-
-  // The full report is long — assert the opportunities section actually rendered
-  // (below the fold in the viewport; fullPage screenshot + DOM check).
+  // Gate 6b: the report (first mission) renders ranked opportunities with
+  // separated score chips — DOM-checked; the panel scrolls internally so the
+  // element lives below the fold in the viewport.
   const opportunityCount = await frame.locator(".opportunity").count();
   assert.ok(opportunityCount > 0, `expected ranked opportunities, got ${opportunityCount}`);
   const scoreChips = await frame.locator(".opportunity .score").count();
@@ -273,10 +260,96 @@ try {
     `${opportunityCount} opportunities with ${scoreChips} separated score chips (observed / cross-source / predicted / confidence)`,
   );
 
+  // ---------------------------------------------------------------------
+  // W4 gates: the creative handoff driven through the panel in the browser.
+  // ---------------------------------------------------------------------
+  // Rank through the server (the agent's job) for the FIRST mission — the one
+  // the onboarding form created (auto-generated id), pushed so the panel
+  // refreshes, then switch to the Creative tab.
+  const w4List = await call("marketing_mission_list", {});
+  const w4Missions = w4List.structuredContent.missions;
+  const first = w4Missions.find((m) => m.brief.product === "portable espresso maker");
+  assert.ok(first, "first mission exists");
+  const rank = await call("marketing_rank_opportunities", { missionId: first.missionId });
+  assert.ok(!rank.isError, JSON.stringify(rank.content));
+  await outer.evaluate((result) => window.__sendToolResult(result), rank);
+
+  await frame.locator('[data-tab="creative"]').click();
+  await frame.locator(".card", { hasText: "Ranked hypotheses" }).waitFor({ timeout: 15000 });
+
+  // Gate 7: drafting from the panel produces the handoff pack.
+  await frame.locator("[data-draft]").first().click();
+  await frame
+    .locator(".card", { hasText: "Creative handoff pack" })
+    .first()
+    .waitFor({ timeout: 30000 });
+  const scriptRows = await frame.locator(".card table.data tr").count();
+  assert.ok(scriptRows >= 4, `expected the timed script beats table, got ${scriptRows} rows`);
+  gate(
+    "panel-drafts-creative-handoff-pack",
+    true,
+    "handoff pack renders with timed script beats, prompt packs and provenance",
+  );
+  await shotFull("06-creative-draft.png");
+
+  // Gate 8: the panel approves the pack (explicit review).
+  await frame.locator("[data-review-approve]").first().click();
+  await frame.locator(".state", { hasText: "approved" }).first().waitFor({ timeout: 15000 });
+  gate("panel-review-approves-pack", true, "explicit approval flips the artifact status to approved");
+
+  // Gate 9: bring-back — file import + declaration + rubric report.
+  await frame.fill('#record-asset-form input[name="hookText"]', "Cafe-grade espresso on your commute");
+  await frame.fill('#record-asset-form input[name="proofText"]', "unedited before/after extraction demo");
+  await frame.fill('#record-asset-form input[name="ctaText"]', "Get yours with the 30-day trial");
+  await frame.fill(
+    '#record-asset-form textarea[name="transcriptOrCopy"]',
+    "Cafe-grade espresso on your commute. Watch the portable espresso maker pull a real shot. Get yours with the 30-day trial.",
+  );
+  const chooser = outer.waitForEvent("filechooser");
+  await frame.locator('#record-asset-form input[type="file"]').click();
+  const fixtureFile = join(tmpdir(), "marketing-e2e-ad.mp4");
+  await writeFile(fixtureFile, Buffer.from("fake-mp4-bytes-for-the-w4-panel-gate"));
+  await (await chooser).setFiles(fixtureFile);
+  await frame.locator('#record-asset-form button[type="submit"]').click();
+  await frame
+    .locator(".card", { hasText: "Recorded asset" })
+    .first()
+    .waitFor({ timeout: 30000 });
+  const rubricRows = await frame
+    .locator('.card:has-text("Recorded asset") .row')
+    .count();
+  assert.ok(rubricRows > 0, "rubric checks rendered");
+  const fileCell = await frame
+    .locator(".kv dd.mono")
+    .allTextContents();
+  assert.ok(fileCell.some((cell) => cell.includes("ad.mp4") && cell.includes(".zcode/marketing/")), "imported file recorded in the mission workspace");
+  gate(
+    "panel-records-asset-with-rubric",
+    true,
+    `chunked import + declaration recorded; ${rubricRows} rubric checks rendered with the file in the mission workspace`,
+  );
+
+  // Expand the frame to capture the full creative tab, then screenshot.
+  await outer.evaluate(() => {
+    const frameEl = document.querySelector("iframe");
+    const doc = frameEl.contentDocument;
+    const scroller = doc.querySelector(".main");
+    const wanted = scroller
+      ? scroller.scrollHeight + scroller.offsetTop + 40
+      : doc.body.scrollHeight + 40;
+    frameEl.style.height = `${Math.max(wanted, 900)}px`;
+  });
+  await shotFull("07-creative-asset-recorded.png");
+
   gate("no-page-errors", errors.length === 0, errors.length ? errors.join(" | ") : "clean console");
+} catch (error) {
+  gates.push(`FAIL  unexpected-error — ${String(error)}`);
+  console.error(String(error?.stack ?? error));
+  process.exitCode = 1;
+  await outer.screenshot({ path: join(artifacts, "99-failure.png"), fullPage: true }).catch(() => undefined);
 } finally {
   const summary = [
-    "W3-4 marketing workspace panel — browser E2E gates",
+    "W3-4 + W4 marketing workspace panel — browser E2E gates",
     `server: ${join(plugin, "dist/server.mjs")} (real bundled plugin process)`,
     `panel: ui://marketing/panel.html (${(Buffer.byteLength(html) / 1024).toFixed(0)} KiB self-contained resource)`,
     `browser: chromium ${browser.version()} — MCP Apps AppBridge host, desktop sandbox CSP`,

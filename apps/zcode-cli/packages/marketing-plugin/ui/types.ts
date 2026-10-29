@@ -33,6 +33,54 @@ export interface MissionEntry {
   competitors: Competitor[];
 }
 
+/** W4: persisted creative state (marketing_list_artifacts output). */
+export interface CreativeArtifact {
+  id: string;
+  missionId: string;
+  hypothesisId: string;
+  kindOf: "promptPack" | "script" | "storyboard" | "uploadedAsset";
+  status: "draft" | "review" | "approved" | "rejected" | "published";
+  approvedBy?: string;
+  brief: {
+    intent?: { angle?: string; objective?: string; audience?: string; hypothesisId?: string };
+    blueprint?: { hook?: string; format?: string; demonstration?: string; cta?: string; pacing?: string };
+    script?: Array<{ startSec: number; endSec: number; line: string; visual: string; onScreenText?: string }>;
+    storyboard?: Array<{ beat: string; visual: string; onScreenText?: string }>;
+    generatorPromptPacks?: {
+      videoGen?: { prompt?: string; negativeConstraints?: string[]; durationSec?: number; aspectRatio?: string };
+      thumbnail?: { prompt?: string; textOverlay?: string };
+      copy?: { titleVariants?: string[]; ctaLine?: string };
+    };
+    experimentSpec?: { metric?: string; windowDays?: number; changedVariables?: string[] };
+    draftedBy?: string;
+    declaration?: {
+      format: string;
+      durationSec?: number;
+      aspectRatio?: string;
+      hookText: string;
+      proofText: string;
+      ctaText: string;
+      transcriptOrCopy: string;
+      file?: { name: string; bytes: number; path: string };
+    };
+    rubric?: {
+      rubricVersion: string;
+      verdict: string;
+      score: number;
+      assessedBy: string;
+      checks: Array<{ id: string; severity: string; message: string; suggestion?: string }>;
+    };
+    review?: { decision: string; reviewedBy: string; at: string; notes?: string };
+    producedFrom?: string;
+  };
+  promptPack?: Record<string, unknown>;
+}
+
+export interface CreativeState {
+  hypotheses: Array<{ id: string; pattern: { message: string; hook: string; format: string }; confidence: number }>;
+  artifacts: CreativeArtifact[];
+}
+
 export interface CoverageSlice {
   slice: string;
   state: "ok" | "partial" | "gap";

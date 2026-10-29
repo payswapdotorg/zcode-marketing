@@ -20,7 +20,13 @@
   仅当任务真实观测到零条广告证据时排序工具才返回 `paid_source_gap` 类型化错误，
   绝不编造广告证据；demo 模式的合成 fixture 在每个覆盖切片与报告里标注。
 - **mission 状态只落工作区**：索引 `missions-index.json` + 每任务一个 SQLite 时序库
-  （复用 W2 的 `SqliteTemporalStore`，幂等摄取、显式修订）；进程重启后仍可读。
+  （复用 W2 的 `SqliteTemporalStore`，幂等摄取、显式修订）+ W4 创意状态
+  `<missionId>-artifacts.json`（内容去重的稳定假设 id、创意工件、rubric 报告；进程重启后仍可读）
+  + 面板导入的资产文件 `<missionId>/assets/`；进程重启后仍可读。
+- **创意交接契约（W4）**：起草/审阅/导入/记录/比较全部走工具面（同一注册器）；
+  批准必须显式（review→approved，非法迁移拒绝）；资产带回必须分块导入并校验字节数
+  （不匹配即中止，绝不落半文件）；rubric 是版本化的建议者（v1：确定性规则检查 + 可路由的
+  定性评估，provenance 记录 assessedBy）——只报告与建议，绝不改写创意、绝不自动批准。
 - **连接器组合不越契约**：`CompositeConnector` 仅合并子连接器的返回页与覆盖切片
   （逐字保留，不修饰）；子连接器仍各自遵守 `PLATFORM-CONNECTOR-CONTRACT.md`。
 

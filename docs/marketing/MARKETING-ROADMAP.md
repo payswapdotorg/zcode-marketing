@@ -1,6 +1,6 @@
 # MARKETING-ROADMAP
 
-> Phases, dependencies, deliverables, acceptance gates, and open blockers. Wave gates are non-negotiable; a wave is complete when its gate passes with recorded evidence (see WORK-REGISTRY.md for live status). Last updated: 2026-10-29 (W3-4 complete: the rendered marketing workspace panel — the branded research experience — is live and browser-verified; W4 is the active wave).
+> Phases, dependencies, deliverables, acceptance gates, and open blockers. Wave gates are non-negotiable; a wave is complete when its gate passes with recorded evidence (see WORK-REGISTRY.md for live status). Last updated: 2026-10-29 (W4 complete: the creative handoff runs end to end — pack → approval → chunked bring-back → versioned rubric → comparison — through both the tool chain and the panel; W5 is the active wave).
 
 ## Wave plan
 
@@ -27,7 +27,7 @@
 ### W4 — Creative strategy and production handoff
 - Structured creative brief, generator-specific prompts, scripts, storyboards, testable hypotheses; asset upload, comparison, validation.
 - **Exit gate:** the user can take a recommendation into a creative platform, produce an asset, and bring it back into the same marketing mission.
-- **Status:** ⬜ Not started. Brief generation logic prototyped in the demo loop; validation rubric specified in MARKETING-EVALUATION.md.
+- **Status:** ✅ Complete (2026-10-29, W4-1). The full production pack (`marketing_draft_creative`: brief, timed 4-beat script, storyboard, video-gen/thumbnail/copy prompt packs, testable experiment spec, drafting provenance) → explicit review/approval (`marketing_review_artifact`, invalid transitions refused) → chunked bring-back (`marketing_asset_import_*` into the mission workspace, byte-count verified) → the versioned validation rubric (`RUBRIC_VERSION v1`: deterministic rule checks + routed qualitative assessment with provenance; suggests, never edits) → comparison (`marketing_compare_assets`). Hypotheses persist with content-stable ids; creative state is restart-safe (`.zcode/marketing/missions/<id>-artifacts.json`). The workspace panel's Creative tab renders the whole handoff (draft → approve → bring-back with a real file chooser → rubric report). Evidence: `evidence/2026-10-29-w4-creative-handoff.txt` (31 gates, real spawned server), W4 gates in `evidence/2026-10-29-w3-4-panel-e2e.txt` (browser), rubric suite 9/9, plugin suite 46/46.
 
 ### W5 — Authorized publishing
 - Platform-specific publishing adapters, consent handling, approval controls, post-status verification, publication records; assisted/manual path for unsupported platforms.

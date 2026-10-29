@@ -22,6 +22,10 @@ export const MARKETING_PLUGIN_SKILL = "skills/marketing/SKILL.md" as const;
 export const MARKETING_WORKSPACE_DIR = ".zcode/marketing" as const;
 export const MARKETING_MISSIONS_INDEX = ".zcode/marketing/missions-index.json" as const;
 export const MARKETING_MISSION_DB = ".zcode/marketing/missions/<missionId>.sqlite" as const;
+/** W4：每任务的创意状态（排名后的假设 + 创意工件），与索引同构持久化。 */
+export const MARKETING_MISSION_ARTIFACTS = ".zcode/marketing/missions/<missionId>-artifacts.json" as const;
+/** W4：面板导入的资产文件落点。 */
+export const MARKETING_MISSION_ASSETS = ".zcode/marketing/missions/<missionId>/assets/" as const;
 
 /** 本波次注册的 MCP 工具（输入/输出 schema 见 src/server.ts；语义见 docs/marketing/）。 */
 export const MARKETING_TOOLS = [
@@ -33,6 +37,15 @@ export const MARKETING_TOOLS = [
   "marketing_rank_opportunities",
   "marketing_mission_report",
   "marketing_evidence_view",
+  // W4 — creative strategy & production handoff.
+  "marketing_draft_creative",
+  "marketing_list_artifacts",
+  "marketing_review_artifact",
+  "marketing_asset_import_begin",
+  "marketing_asset_import_write",
+  "marketing_asset_import_finish",
+  "marketing_record_asset",
+  "marketing_compare_assets",
 ] as const;
 
 export type MarketingTool = (typeof MARKETING_TOOLS)[number];
@@ -51,6 +64,12 @@ export const MARKETING_PANEL_TOOLS = [
   "marketing_research_platform",
   "marketing_mission_report",
   "marketing_evidence_view",
+  // W4 creative handoff surfaces.
+  "marketing_draft_creative",
+  "marketing_list_artifacts",
+  "marketing_review_artifact",
+  "marketing_record_asset",
+  "marketing_compare_assets",
 ] as const;
 
 export interface MarketingPluginContract {
@@ -70,6 +89,8 @@ export interface MarketingPluginContract {
     dir: typeof MARKETING_WORKSPACE_DIR;
     missionIndex: typeof MARKETING_MISSIONS_INDEX;
     missionDb: typeof MARKETING_MISSION_DB;
+    missionArtifacts: typeof MARKETING_MISSION_ARTIFACTS;
+    missionAssets: typeof MARKETING_MISSION_ASSETS;
   };
   /**
    * 模型通道契约（W3-2）：结构化抽取只经宿主 MCP `sampling/createMessage`

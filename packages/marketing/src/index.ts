@@ -24,6 +24,8 @@ export { CapabilityCatalog } from './app/capabilityCatalog.js';
 export type { RoutingChoice, RoutingDecision } from './app/capabilityCatalog.js';
 export { MarketingMission } from './app/workflows.js';
 export type { OpportunityScore } from './app/workflows.js';
+export { RUBRIC_VERSION, buildRubricReport, runDeterministicRubric, scoreRubric } from './app/rubric.js';
+export type { AssetDeclaration, RubricCheck, RubricReport } from './app/rubric.js';
 export type {
   ConnectorError,
   ConnectorCapabilities,

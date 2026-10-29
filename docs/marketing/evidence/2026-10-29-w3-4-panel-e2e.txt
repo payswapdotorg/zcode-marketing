@@ -1,12 +1,12 @@
 ================================================================================
-W3-4 — Marketing workspace panel: browser E2E verification run
-Date: 2026-10-29 07:59 UTC  ·  exit code: 0
+W3-4 + W4 — Marketing workspace panel: browser E2E verification run
+Date: 2026-10-29 08:47 UTC  ·  exit code: 0  ·  11 gates
 Reproduce: pnpm --filter @zcode/marketing-plugin demo:w3-4
 ================================================================================
 
-W3-4 marketing workspace panel — browser E2E gates
+W3-4 + W4 marketing workspace panel — browser E2E gates
 server: /home/z/my-project/zcode/apps/zcode-cli/packages/marketing-plugin/dist/server.mjs (real bundled plugin process)
-panel: ui://marketing/panel.html (618 KiB self-contained resource)
+panel: ui://marketing/panel.html (632 KiB self-contained resource)
 browser: chromium 143.0.7499.4 — MCP Apps AppBridge host, desktop sandbox CSP
 artifacts: /tmp/marketing-panel-e2e
 
@@ -17,6 +17,9 @@ PASS  panel-research-renders-coverage — coverage slices rendered: unavailable,
 PASS  evidence-tab-renders-provenance — 3 provenance tables rendered
 PASS  agent-tool-result-refreshes-panel — mission list updated from a forwarded tool result, no panel action
 PASS  report-renders-ranked-opportunities — 1 opportunities with 5 separated score chips (observed / cross-source / predicted / confidence)
+PASS  panel-drafts-creative-handoff-pack — handoff pack renders with timed script beats, prompt packs and provenance
+PASS  panel-review-approves-pack — explicit approval flips the artifact status to approved
+PASS  panel-records-asset-with-rubric — chunked import + declaration recorded; 8 rubric checks rendered with the file in the mission workspace
 PASS  no-page-errors — clean console
 
 no page errors
@@ -24,10 +27,9 @@ no page errors
 
 --------------------------------------------------------------------------------
 Visual verification (GLM-5V over the artifacts, recorded 2026-10-29):
-- 03-coverage-rendered.png: coverage slices with distinct state badges (unavailable/not_connected/
-  available/restricted), provenance column, honest conclusion statement rendered.
-- 05-agent-push-refreshed.png (full panel): ranked opportunity #1 with separated score chips
-  (observed 4112.5 / cross-source 1.0 / predicted 14000 / confidence 0.60 / forecast
-  8000-22000 views), performance signals section, two missions in the sidebar, demo-mode
-  notice. No rendering defects reported.
+- 06-creative-draft.png: handoff pack card with review chip, timed script table
+  (Time/Line/Visual), video-gen + thumbnail prompt blocks, copy variants.
+- 07-creative-asset-recorded.png (full tab): approved chip on the pack, 'Recorded asset'
+  card with rubric checks (colored pass/warn badges) + file info, bring-back form.
+  No functional or layout defects reported.
 ================================================================================

@@ -15,7 +15,8 @@
     "demo:w3": "pnpm build && node scripts/w3-chain.mjs",
     "demo:w3-2": "pnpm build && node scripts/w3-2-sampling-chain.mjs",
     "demo:w3-3": "pnpm build && node scripts/w3-3-run-all.mjs",
-    "demo:w3-4": "pnpm build && node scripts/w3-4-panel-e2e.mjs"
+    "demo:w3-4": "pnpm build && node scripts/w3-4-panel-e2e.mjs",
+    "demo:w4": "pnpm build && node scripts/w4-chain.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
