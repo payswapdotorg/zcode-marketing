@@ -67,6 +67,41 @@ const performanceSignalShape = {
   note: z.string(),
 };
 
+/**
+ * Research-integrity gate (docs/marketing/MARKETING-EVALUATION.md: "a
+ * recommendation without a traceable EvidenceReference is an automatic
+ * failure", enforced mechanically, not prompted). A ranked opportunity is
+ * kept only when every `supportedBy` ref resolves to a record the mission
+ * actually observed (an ingested ad or organic content id). Model adapters
+ * are never trusted to self-police: opportunities citing unrecorded
+ * evidence are DROPPED and the drop is reported, never silently kept.
+ */
+export function applyResearchIntegrityGate(
+  ads: Array<{ id: string }>,
+  organic: Array<{ id: string }>,
+  opportunities: OpportunityScore[],
+): { kept: OpportunityScore[]; dropped: number; droppedRefs: string[] } {
+  const resolvable = new Set<string>([...ads.map((a) => a.id), ...organic.map((o) => o.id)]);
+  const kept: OpportunityScore[] = [];
+  const droppedRefs: string[] = [];
+  for (const opportunity of opportunities) {
+    const unresolved = opportunity.hypothesis.supportedBy.filter((e) => !resolvable.has(e.ref));
+    if (unresolved.length === 0) {
+      kept.push(opportunity);
+    } else {
+      droppedRefs.push(...unresolved.map((e) => e.ref));
+    }
+  }
+  return { kept, dropped: opportunities.length - kept.length, droppedRefs };
+}
+
+const integrityGateNote = (result: { dropped: number; droppedRefs: string[] }): string[] =>
+  result.dropped > 0
+    ? [
+        `research-integrity gate: ${result.dropped} candidate opportunities were DROPPED — they cited evidence refs not recorded in this mission (${[...new Set(result.droppedRefs)].join(', ')}). MARKETING-EVALUATION.md: a recommendation without a traceable EvidenceReference is an automatic failure; the drop is reported, never silent.`,
+      ]
+    : [];
+
 export function createMarketingServer(
   runtime: MarketingRuntime,
   options: MarketingServerOptions = {},
@@ -300,7 +335,11 @@ export function createMarketingServer(
       }
       const adFeatures = await runtime.extractFeatures(loaded, mission.store.allAds());
       const organicFeatures = await runtime.extractFeatures(loaded, mission.store.allOrganic());
-      const opportunities: OpportunityScore[] = await mission.rankOpportunities(adFeatures, organicFeatures);
+      const ranked: OpportunityScore[] = await mission.rankOpportunities(adFeatures, organicFeatures);
+      // Research-integrity gate: keep only opportunities whose evidence refs
+      // resolve to records this mission actually observed; report the drop.
+      const gated = applyResearchIntegrityGate(mission.store.allAds(), mission.store.allOrganic(), ranked);
+      const opportunities: OpportunityScore[] = gated.kept;
       // W4: persist the ranked hypotheses so a creative draft can reference
       // the exact opportunity by id, across processes.
       await runtime.saveHypotheses(
@@ -318,6 +357,7 @@ export function createMarketingServer(
             `    contrary: ${o.hypothesis.contradictedBy.length === 0 ? 'none recorded' : o.hypothesis.contradictedBy.map((e) => e.ref).join(', ')}\n` +
             `    why: ${o.explanation}`,
         ),
+        ...integrityGateNote(gated),
       ].join('\n');
       return { text, structured: { opportunities } };
     },
@@ -360,13 +400,16 @@ export function createMarketingServer(
         const adFeatures = await runtime.extractFeatures(loaded, mission.store.allAds());
         const organicFeatures = await runtime.extractFeatures(loaded, mission.store.allOrganic());
         extractionModelRefs = [...new Set([...adFeatures, ...organicFeatures].map((f) => f.extractionModelRef))];
-        opportunities = await mission.rankOpportunities(adFeatures, organicFeatures);
+        const ranked: OpportunityScore[] = await mission.rankOpportunities(adFeatures, organicFeatures);
+        // Research-integrity gate — same enforcement as the ranking tool.
+        const gated = applyResearchIntegrityGate(mission.store.allAds(), mission.store.allOrganic(), ranked);
+        opportunities = gated.kept;
         // W4: hypotheses persist with the mission so drafts can cite them.
         await runtime.saveHypotheses(
           input.missionId,
           opportunities.map((o) => o.hypothesis),
         );
-        opportunityNote = '';
+        opportunityNote = integrityGateNote(gated).join(' ');
       }
       const syntheticNote =
         entry.researchMode === 'demo'

@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createMarketingServer } from '../src/server.js';
+import { createMarketingServer, applyResearchIntegrityGate } from '../src/server.js';
 import { MarketingRuntime } from '../src/runtime.js';
 
 /** Fixture fetch: channel resolution + uploads feed + oEmbed, keyless shapes. */
@@ -355,5 +355,96 @@ describe('marketing plugin tool chain', () => {
     });
     expect(start.isError).toBe(true);
     expect(start.text).toContain('no verified connector');
+  });
+});
+
+describe('research-integrity gate (MARKETING-EVALUATION automatic-failure rule, mechanical)', () => {
+  const ref = (r: string) => ({ ref: r, accessMethod: 'officialApi' as const, observedAt: '2026-10-30T00:00:00.000Z', supports: 'test' });
+
+  it('keeps opportunities whose evidence refs resolve to recorded records', () => {
+    const kept = applyResearchIntegrityGate(
+      [{ id: 'ad-1' }, { id: 'ad-2' }],
+      [{ id: 'yt-1' }],
+      [
+        {
+          hypothesis: { supportedBy: [ref('ad-1'), ref('yt-1')] },
+          observed: 1,
+          crossSourceSupport: 1,
+          predicted: 1,
+          confidence: 0.5,
+          explanation: '',
+        } as never,
+      ],
+    );
+    expect(kept.kept.length).toBe(1);
+    expect(kept.dropped).toBe(0);
+  });
+
+  it('DROPS opportunities citing unrecorded evidence and reports the refs — never silently keeps them', () => {
+    const gated = applyResearchIntegrityGate(
+      [{ id: 'ad-1' }],
+      [{ id: 'yt-1' }],
+      [
+        {
+          hypothesis: { supportedBy: [ref('ad-1'), ref('ad-invented-9')] },
+          observed: 1,
+          crossSourceSupport: 1,
+          predicted: 1,
+          confidence: 0.5,
+          explanation: '',
+        } as never,
+        {
+          hypothesis: { supportedBy: [ref('yt-1')] },
+          observed: 1,
+          crossSourceSupport: 1,
+          predicted: 1,
+          confidence: 0.5,
+          explanation: '',
+        } as never,
+      ],
+    );
+    expect(gated.kept.length).toBe(1);
+    expect(gated.dropped).toBe(1);
+    expect(gated.droppedRefs).toEqual(['ad-invented-9']);
+  });
+
+  it('does not disturb the grounded demo-mode ranking flow (dropped = 0)', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'marketing-gate-'));
+    const runtime = new MarketingRuntime(workspace, { fetchLike: fixtureFetch, transparencyFetchLike: atcFixtureFetch });
+    try {
+      const server = createMarketingServer(runtime);
+      const client = new Client({ name: 'gate-test', version: '0.0.1' });
+      const [c, s] = InMemoryTransport.createLinkedPair();
+      await Promise.all([client.connect(c), server.connect(s)]);
+      const call = async (name: string, args: Record<string, unknown>) => {
+        const result = await client.callTool({ name, arguments: args });
+        const text = (result.content as Array<{ type: string; text?: string }>).find((c) => c.type === 'text')?.text ?? '';
+        return { isError: result.isError === true, text, structured: result.structuredContent as Record<string, unknown> };
+      };
+      await call('marketing_mission_start', {
+        product: 'gate test product',
+        audience: 'gate audience',
+        country: 'US',
+        platform: 'youtube',
+        offer: 'gate offer',
+        objective: 'awareness',
+        researchMode: 'demo',
+        missionId: 'mission-gate-test',
+      });
+      await call('marketing_discover_competitors', {
+        missionId: 'mission-gate-test',
+        hints: ['RivalOne'],
+        confirm: ['RivalOne'],
+      });
+      await call('marketing_research_platform', { missionId: 'mission-gate-test' });
+      const rank = await call('marketing_rank_opportunities', { missionId: 'mission-gate-test' });
+      expect(rank.isError).toBe(false);
+      const opportunities = (rank.structured as { opportunities: unknown[] }).opportunities;
+      expect(opportunities.length).toBeGreaterThan(0);
+      // The gate is transparent for grounded refs — no drop note in the output.
+      expect(JSON.stringify(rank.structured)).not.toContain('research-integrity gate:');
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
   });
 });
