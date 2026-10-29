@@ -95,3 +95,30 @@ RUN 2 (8aad8e03, GitHub Actions run 40910954498) — root causes of the two rema
 
   The third run (this fix commit) is the acceptance record for this evidence file;
   per-job results are recorded in the WORK-REGISTRY change log with the run id.
+
+RUN 3 (9274fbe5, run 40914328567) — unit down to its LAST environment-red; root-caused in
+upstream source and fixed hermetically:
+
+  governance ✅ | typecheck ✅ | desktop-e2e ✅ | unit ❌ at exactly 1 of 2054 files:
+  browserDataManager.test.ts "先复制 LocalStorage 快照，再从快照发现 origin" — STILL
+  failing with CHROME_PATH/CHROME_EXECUTABLE unset, so the env-leak hypothesis was
+  incomplete. Real mechanism (chromeInstallationCandidates.ts
+  buildStandardChromeInstallations): every non-darwin/non-win32 platform — including the
+  test's platform:"aix" trick — falls through to the LINUX executable-path candidates
+  (/usr/bin/google-chrome, /opt/google/chrome/chrome, ...), and GitHub's standard
+  ubuntu-24.04 runner image PRE-INSTALLS system Chrome at exactly those paths, so the
+  resolver returns it and flips the assertion (originsFailed 0 vs the expected 1 /
+  chrome_executable_not_found). The test's subject is the importChromeLocalStorage ERROR
+  PATH, not the discovery chain — the aix trick was only a machine-dependent way to
+  force it (it passes on dev machines without system Chrome and fails on standard CI
+  images that ship one).
+
+  FIX (upstream-idiomatic, behavior-preserving): importChromeLocalStorage gains the same
+  optional chromeExecutableDiscovery injection its sibling importChromeBrowserData already
+  exposes (default = the real discovery chain, byte-identical behavior when unset); the
+  test injects async () => null to force the chrome_executable_not_found path
+  deterministically and documents why. Local validation: browserDataManager.test.ts 23/23
+  green; tsc -b packages/desktop/tsconfig.main.json clean. The env -u CHROME_PATH guard
+  stays in the CI (harmless, documents the runner's exported env).
+
+  RUN 4 (the fix commit) is the acceptance record for this evidence file.

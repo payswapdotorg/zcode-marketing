@@ -779,9 +779,14 @@ describe("browserDataManager", () => {
       Buffer.from("binary\0META:https://chat.z.ai", "latin1"),
     );
 
+    // 修复原因：过去用 platform:"aix" 让发现链解析失败——这依赖“本机恰好没装
+    // Chrome”的环境假设；非 darwin/win32 平台全部回落到 Linux 路径候选，而
+    // GitHub Actions 标准 runner 镜像恰好在这些路径预装了系统 Chrome，断言在
+    // CI 上被翻转。改用与 importChromeBrowserData 同款的确定性注入，直接强制
+    // chrome_executable_not_found 错误路径，在任何机器上密闭通过。
     const result = await importChromeLocalStorage({
       profilePath,
-      platform: "aix",
+      chromeExecutableDiscovery: async () => null,
       logger,
       targetSession: {} as Electron.Session,
     });

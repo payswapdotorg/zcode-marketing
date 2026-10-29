@@ -642,6 +642,10 @@ export async function importChromeLocalStorage(options: {
   logger: BrowserDataLogger;
   platform?: NodeJS.Platform;
   chromeExecutablePath?: string;
+  // 与 importChromeBrowserData 的同名注入保持一致：默认走真实发现链；测试可注入
+  // 确定性结果（例如强制 chrome_executable_not_found 错误路径），不依赖所在机器
+  // 是否恰好安装了 Chrome。
+  chromeExecutableDiscovery?: () => Promise<string | null>;
 }): Promise<ChromeLocalStorageImportStats> {
   const sourceLocalStoragePath = join(options.profilePath, "Local Storage");
   if (!(await pathExists(sourceLocalStoragePath))) {
@@ -666,9 +670,14 @@ export async function importChromeLocalStorage(options: {
     originCount = origins.length;
     if (origins.length === 0) return emptyChromeLocalStorageImportStats();
 
+    // 优先级与文档一致：显式路径 > 注入的发现函数 > 真实发现链。
     const executablePath =
       options.chromeExecutablePath ??
-      (await resolveChromeExecutablePath({ platform: options.platform ?? process.platform }));
+      (options.chromeExecutableDiscovery
+        ? await options.chromeExecutableDiscovery()
+        : await resolveChromeExecutablePath({
+            platform: options.platform ?? process.platform,
+          }));
     if (!executablePath) {
       options.logger.warn("[browser-data] Chrome LocalStorage helper 不可用");
       return {
