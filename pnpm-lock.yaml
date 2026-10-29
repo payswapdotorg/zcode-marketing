@@ -637,6 +637,12 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.12.2
+      '@zcode/provider':
+        specifier: workspace:*
+        version: link:../../../../packages/provider
+      '@zcode/provider-node':
+        specifier: workspace:*
+        version: link:../../../../packages/provider-node
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12

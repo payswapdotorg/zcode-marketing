@@ -13,7 +13,8 @@
     "test": "vitest run",
     "lint": "oxlint src --no-ignore",
     "demo:w3": "pnpm build && node scripts/w3-chain.mjs",
-    "demo:w3-2": "pnpm build && node scripts/w3-2-sampling-chain.mjs"
+    "demo:w3-2": "pnpm build && node scripts/w3-2-sampling-chain.mjs",
+    "demo:w3-3": "pnpm build && node scripts/w3-3-run-all.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
@@ -22,6 +23,8 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@zcode/provider": "workspace:*",
+    "@zcode/provider-node": "workspace:*",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.0",
     "vitest": "^4.1.5"

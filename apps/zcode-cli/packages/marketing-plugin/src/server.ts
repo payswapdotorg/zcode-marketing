@@ -273,21 +273,23 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
       readOnly: true,
     },
     async (input) => {
-      const { mission } = await runtime.open(input.missionId);
+      const loaded = await runtime.open(input.missionId);
       const ads = input.subjectRefs
-        ? mission.store.allAds().filter((a) => input.subjectRefs!.includes(a.id))
-        : mission.store.allAds();
+        ? loaded.mission.store.allAds().filter((a) => input.subjectRefs!.includes(a.id))
+        : loaded.mission.store.allAds();
       const organic = input.subjectRefs
-        ? mission.store.allOrganic().filter((o) => input.subjectRefs!.includes(o.id))
-        : mission.store.allOrganic();
+        ? loaded.mission.store.allOrganic().filter((o) => input.subjectRefs!.includes(o.id))
+        : loaded.mission.store.allOrganic();
       if (ads.length + organic.length === 0) {
         throw new MarketingToolError(
           'nothing_to_analyze',
           'no observed ads or organic content in the store — run marketing_research_platform first',
         );
       }
-      const adFeatures = await mission.extractFeatures(ads);
-      const organicFeatures = await mission.extractFeatures(organic);
+      // W3-3: extraction is cached per subject (records are immutable), so
+      // repeated analyze/rank/report calls share one extraction per subject.
+      const adFeatures = await runtime.extractFeatures(loaded, ads);
+      const organicFeatures = await runtime.extractFeatures(loaded, organic);
       const models = [...new Set([...adFeatures, ...organicFeatures].map((f) => f.extractionModelRef))];
       const text = [
         `Creative feature extraction (${input.missionId}): ${adFeatures.length} ad + ${organicFeatures.length} organic feature sets.`,
@@ -316,15 +318,16 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
       readOnly: true,
     },
     async (input) => {
-      const { entry, mission } = await runtime.open(input.missionId);
+      const loaded = await runtime.open(input.missionId);
+      const mission = loaded.mission;
       if (mission.store.allAds().length === 0) {
         throw new MarketingToolError(
           'paid_source_gap',
-          `no ad observations in this mission — the paid x organic intersection needs ad evidence. Live youtube missions ingest the Google Ads Transparency Center (W1-3(b) verified 2026-10-29): zero ads usually means none of the mission's competitors resolved to an advertiser with ads in the mission region — check the research coverage report (per-competitor resolution outcomes are recorded there). Current mode '${entry.researchMode}': in demo mode the labeled synthetic fixtures provide the paid side.`,
+          `no ad observations in this mission — the paid x organic intersection needs ad evidence. Live youtube missions ingest the Google Ads Transparency Center (W1-3(b) verified 2026-10-29): zero ads usually means none of the mission's competitors resolved to an advertiser with ads in the mission region — check the research coverage report (per-competitor resolution outcomes are recorded there). Current mode '${loaded.entry.researchMode}': in demo mode the labeled synthetic fixtures provide the paid side.`,
         );
       }
-      const adFeatures = await mission.extractFeatures(mission.store.allAds());
-      const organicFeatures = await mission.extractFeatures(mission.store.allOrganic());
+      const adFeatures = await runtime.extractFeatures(loaded, mission.store.allAds());
+      const organicFeatures = await runtime.extractFeatures(loaded, mission.store.allOrganic());
       const opportunities: OpportunityScore[] = await mission.rankOpportunities(adFeatures, organicFeatures);
       const text = [
         `Ranked opportunities (${input.missionId}) — scores are SEPARATED, never blended:`,
@@ -362,7 +365,8 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
       readOnly: true,
     },
     async (input) => {
-      const { entry, mission } = await runtime.open(input.missionId);
+      const loaded = await runtime.open(input.missionId);
+      const { entry, mission } = loaded;
       const coverage = mission.store.latestCoverage();
       const competitors = entry.competitors;
       const signals = mission.performanceSignals([
@@ -374,8 +378,8 @@ export function createMarketingServer(runtime: MarketingRuntime): McpServer {
         'No ranked opportunities: no ad evidence was ingested — check the research coverage report for per-competitor ad-source resolution outcomes, or run demo mode to see the loop with labeled synthetic fixtures.';
       let extractionModelRefs: string[] = [];
       if (mission.store.allAds().length > 0) {
-        const adFeatures = await mission.extractFeatures(mission.store.allAds());
-        const organicFeatures = await mission.extractFeatures(mission.store.allOrganic());
+        const adFeatures = await runtime.extractFeatures(loaded, mission.store.allAds());
+        const organicFeatures = await runtime.extractFeatures(loaded, mission.store.allOrganic());
         extractionModelRefs = [...new Set([...adFeatures, ...organicFeatures].map((f) => f.extractionModelRef))];
         opportunities = await mission.rankOpportunities(adFeatures, organicFeatures);
         opportunityNote = '';

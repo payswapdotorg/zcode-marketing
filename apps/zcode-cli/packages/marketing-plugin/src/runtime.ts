@@ -27,10 +27,13 @@ import {
   productBrief,
 } from '@zcode/marketing';
 import type {
+  AdCreative,
   CompetitorCandidate,
   ConnectorMeta,
+  CreativeFeatureSet,
   MarketingConnector,
   ModelPort,
+  OrganicContent,
   ProductBrief,
   TemporalStorePort,
 } from '@zcode/marketing';
@@ -66,6 +69,14 @@ export interface LoadedMission {
   connector: MarketingConnector;
   /** Temporal store handle kept open between tool calls; closed on runtime close. */
   store: TemporalStorePort;
+  /**
+   * Per-subject creative-feature cache (W3-3). Observed subject records are
+   * immutable (same id = same content), so re-running model extraction on every
+   * analyze/rank/report call only duplicated paid model calls and blew the
+   * host's 30s MCP tool budget. Cached feature sets keep their original
+   * provenance; subjects ingested after the last call extract on the next one.
+   */
+  featureCache: Map<string, CreativeFeatureSet>;
 }
 
 const unionCapabilities = (connectors: MarketingConnector[]): ConnectorMeta['capabilities'] => ({
@@ -251,7 +262,7 @@ export class MarketingRuntime {
       this.now,
       store,
     );
-    const loaded: LoadedMission = { entry, mission, connector, store };
+    const loaded: LoadedMission = { entry, mission, connector, store, featureCache: new Map() };
     this.loaded.set(missionId, loaded);
     return loaded;
   }
@@ -298,6 +309,25 @@ export class MarketingRuntime {
       );
     }
     return mission.research(entry.competitors);
+  }
+
+  /**
+   * Cached creative-feature extraction (W3-3): extraction runs once per subject
+   * per mission process; analyze/rank/report share the cached domain records.
+   * New subjects extract on the call that first observes them.
+   */
+  async extractFeatures(
+    loaded: LoadedMission,
+    subjects: Array<AdCreative | OrganicContent>,
+  ): Promise<CreativeFeatureSet[]> {
+    const fresh = subjects.filter((s) => !loaded.featureCache.has(s.id));
+    if (fresh.length > 0) {
+      const extracted = await loaded.mission.extractFeatures(fresh);
+      for (const features of extracted) loaded.featureCache.set(features.subjectRef, features);
+    }
+    return subjects
+      .map((s) => loaded.featureCache.get(s.id))
+      .filter((features): features is CreativeFeatureSet => features !== undefined);
   }
 
   async close(): Promise<void> {

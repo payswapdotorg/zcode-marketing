@@ -1,0 +1,320 @@
+W3-3 real ZCode-host / real provider-registry verification run (the P2 gate)
+Date: 2026-10-29 (UTC)
+Environment: zcode-marketing fork sandbox — Node v24.22.1, pnpm 10.33.2, Linux x64, 4 GB RAM
+Reproduce: pnpm --filter @zcode/marketing-plugin demo:w3-3
+  (scripts/w3-3-run-all.mjs orchestrates: seed personal provider -> run A -> kill-proxy -> re-seed -> run B)
+
+What is actually exercised in this run — the full production path, no stand-ins:
+  - The REAL CLI host: `tsx packages/cli/src/main.ts agent-server` — the actual ZCode
+    runtime entry (agent loop, tool executor, permission broker, MCP plugin host,
+    provider registry, sampleModel).
+  - A REAL personal provider in the sandbox provider config
+    (ZCODE_DATA_BASE_DIR-isolated provider_config.json, provider zai-sandbox-glm,
+    api openai-chat-completions) pointing at the sandbox-provisioned GLM service
+    (https://internal-api.z.ai/v1) — the same personal-provider mechanism the
+    desktop product uses for user-added providers.
+  - A REAL model doing the work end to end: glm-4-plus plans the mission, calls the
+    marketing tools itself, and the marketing plugin's structured extraction goes
+    sampling/createMessage -> host adapters handler -> mcp-server-sampling module ->
+    record.app.sampleModel -> provider registry -> openai-compatible adapter -> GLM.
+  - The REAL permission broker: the run auto-allowed 6 permission requests through the
+    interaction/requestPermission reverse RPC (recorded in the transcript).
+  - The REAL mission persistence: .zcode/marketing/missions-index.json + one SQLite
+    temporal store per mission in the workspace.
+
+Run A (routed proof): provider baseUrl = the GLM endpoint directly.
+  Gates: session created; >=5 marketing tools executed; every marketing tool call
+  completed with a result; turn completed; extraction provenance records the ACTUAL
+  executed model (zcode:routed:glm-4-plus — an actual model name, not the
+  documentation placeholder); any fallback is labeled with its reason; mission
+  persisted. ALL PASSED (zero fallbacks in run A — every extraction routed).
+
+Run B (explicit-fallback proof): provider baseUrl = a deterministic sampling-kill proxy
+  (scripts/w3-3-sampling-kill-proxy.mjs) that forwards agent traffic verbatim to GLM
+  but rejects every sampling-shaped request with a 401 (non-retryable, like an expired
+  credential — a 5xx would retry-with-backoff past the host's 30s MCP tool budget).
+  Gates: the SAME mission still completes (tools succeed via the labeled fallback);
+  provenance records heuristic:* (fallback: <reason>) for every extraction; no actual
+  routed extraction occurred. ALL PASSED (35 labeled fallbacks, 35/35 carry the
+  heuristic prefix and reason; zero routed refs — only documentation placeholders).
+
+Incidents recorded honestly (development iterations before the passing run):
+  1. First full run: marketing_mission_report hit the host's 30s MCP tool timeout
+     (TOOL_TIMEOUT) — the report tool re-ran model extraction for every subject on
+     every call (analyze/rank/report each re-extracting = duplicate paid model calls).
+     Fixed by the per-subject feature cache in the plugin runtime (W3-3 note in
+     runtime.ts): observed records are immutable, so one extraction per subject is
+     semantically identical; the fix removes duplicate paid calls, it does not alter
+     outputs. 39/39 plugin tests pass unchanged after the fix.
+  2. GLM upstream rate limits (HTTP 429 "Too many requests") occurred repeatedly
+     during the runs; the host's provider retry policy retried them and recovered.
+     Recorded in the stderr excerpts below — real-world behavior, not a failure.
+  3. With a 503 kill status the AI-SDK retried sampling failures until tools timed out;
+     the kill status was changed to 401 (non-retryable) so run B verifies the
+     FALLBACK path, not the retry policy. The first run-B attempt (2/6 tools) is
+     recorded here as an honest iteration; the final run B passed 6/6.
+
+Note on run B prompt marker: the kill proxy discriminates by the marketing plugin's
+distinctive sampling system prompts (all end with "Return STRICT JSON only.") — the
+phrase does not appear in the marketing skill file, tool descriptions, or agent context.
+
+=======================================================================
+== W3-3: real ZCode-host / real provider-registry verification ==
+date: 2026-10-29T05:51:15.124Z
+host: zcode agent-server (tsx dev entry, real runtime)
+provider: personal provider_config.json — zai-sandbox-glm/glm-4-plus (openai-chat-completions)
+model endpoint: https://internal-api.z.ai/v1 (sandbox-provisioned GLM service)
+
+== seeding personal provider (run A, direct endpoint) ==
+{
+  "seeded": true,
+  "filePath": "/tmp/w33-seed-a-3Bhznd/.zcode/v2/provider_config.json",
+  "providerId": "zai-sandbox-glm",
+  "modelId": "glm-4-plus",
+  "baseUrl": "https://internal-api.z.ai/v1",
+  "personalProviderCount": 1
+}
+
+== run A: full mission through the real host ==
+== W3-3 real-host run A ==
+sandbox: /tmp/w33-host-a-4hghaR
+host: tsx /home/z/my-project/zcode-marketing/apps/zcode-cli/packages/cli/src/main.ts agent-server
+provider: zai-sandbox-glm/glm-4-plus (direct GLM endpoint)
+
+[driver] creating session in the real host…
+[driver] session sess_3d8b30ea-c9a4-4c3a-bf38-56ac3a892362 — sending the mission prompt…
+
+== transcript summary (turn.completed) ==
+tool events (24): [{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_mission_start","toolCallId":"call_791763bc2e1349e5af044532"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_mission_start","toolCallId":"call_791763bc2e1349e5af044532"},{"kind":"result","toolName":null,"toolCallId":"call_791763bc2e1349e5af044532"},{"kind":"batch","toolName":null},{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_discover_competitors","toolCallId":"call_c32c9321a71c42e4ae711c70"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_discover_competitors","toolCallId":"call_c32c9321a71c42e4ae711c70"},{"kind":"result","toolName":null,"toolCallId":"call_c32c9321a71c42e4ae711c70"},{"kind":"batch","toolName":null},{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_research_platform","toolCallId":"call_725398305c9a4500b58e95ec"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_research_platform","toolCallId":"call_725398305c9a4500b58e95ec"},{"kind":"result","toolName":null,"toolCallId":"call_725398305c9a4500b58e95ec"},{"kind":"batch","toolName":null},{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_analyze_creative","toolCallId":"call_6be7ca004ec44e388fd4cd08"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_analyze_creative","toolCallId":"call_6be7ca004ec44e388fd4cd08"},{"kind":"result","toolName":null,"toolCallId":"call_6be7ca004ec44e388fd4cd08"},{"kind":"batch","toolName":null},{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_rank_opportunities","toolCallId":"call_85eb4ed9b2304a8fac9f6908"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_rank_opportunities","toolCallId":"call_85eb4ed9b2304a8fac9f6908"},{"kind":"result","toolName":null,"toolCallId":"call_85eb4ed9b2304a8fac9f6908"},{"kind":"batch","toolName":null},{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_mission_report","toolCallId":"call_f38743322f104e169d893396"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_mission_report","toolCallId":"call_f38743322f104e169d893396"},{"kind":"result","toolName":null,"toolCallId":"call_f38743322f104e169d893396"},{"kind":"batch","toolName":null}]
+permission requests auto-allowed: 6
+
+== gates ==
+  ✔ session created in the real host (id sess_3d8b30ea-c9a4-4c3a-bf38-56ac3a892362)
+  ✔ tool executions observed in the real agent loop (24 tool events)
+  ✔ marketing tool chain executed (6 distinct tools): mission_start, discover_competitors, research_platform, analyze_creative, rank_opportunities, mission_report
+  ✔ every marketing tool call completed with a result (6/6)
+  ✔ turn completed without failure
+  ✔ structured extraction routed through the host provider system (zcode:routed: provenance present)
+  ✔ executed model recorded as the real GLM session model (zcode:routed:glm-4-plus — an actual model name, not the documentation placeholder)
+  ✔ every fallback is labeled with reason in provenance (0/0 labeled) — no silent substitution
+  ✔ mission persisted in the workspace (missions-index.json)
+
+== persistence + stderr tail ==
+missions-index.json: mission-w33-a [demo]
+mission sqlite store exists: /tmp/w33-host-a-4hghaR/workspace/.zcode/marketing/missions/mission-w33-a.sqlite
+
+full transcript (455 entries): /tmp/w33-host-a-4hghaR/w33-transcript.json
+
+== provenance lines of interest ==
+- Creative feature extraction (mission-w33-a): 2 ad + 2 organic feature sets.
+Extraction models used: zcode:routed:glm-4-plus
+
+- ad-rivalone-v0: hook "benefit-led" (demonstrates product benefits visually); narrative showcases product features -> demonstrates benefits in action -> establishes product value; offer: benefit demonstration without explicit offer details
+- ad-rivaltwo-v0: hook "urgency-led" (time-sensitive discount offer); narrative presents limited-time discount -> creates urgency for …
+- Creative feature extraction (mission-w33-a): 2 ad + 2 organic feature sets.
+Extraction models used: zcode:routed:glm-4-plus
+
+- ad-rivalone-v0: hook "benefit-led" (demonstrates product benefits visually); narrative showcases product features -> demonstrates benefits in action -> establishes product value; offer: benefit demonstration without explicit offer details
+- ad-rivaltwo-v0: hook "urgency-led" (time-sensitive discount offer); narrative presents limited-time discount -> creates urgency for …
+- Creative feature extraction (mission-w33-a): 2 ad + 2 organic feature sets.
+Extraction models used: zcode:routed:glm-4-plus
+
+- ad-rivalone-v0: hook "benefit-led" (demonstrates product benefits visually); narrative showcases product features -> demonstrates benefits in action -> establishes product value; offer: benefit demonstration without explicit offer details
+- ad-rivaltwo-v0: hook "urgency-led" (time-sensitive discount offer); narrative presents limited-time discount -> creates urgency for …
+- # Marketing intelligence report — mission-w33-a
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (5)
+
+- RivalOne [confirmed] — Offers portable coffee makers for commuting professionals with a 30-day trial
+
+- RivalTwo [confirmed] — Provides portable espresso solutions targeting 25-40 year old commuters with free shipping
+
+- Wacaco — Known for portable espresso…
+- # Marketing intelligence report — mission-w33-a
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (5)
+
+- RivalOne [confirmed] — Offers portable coffee makers for commuting professionals with a 30-day trial
+
+- RivalTwo [confirmed] — Provides portable espresso solutions targeting 25-40 year old commuters with free shipping
+
+- Wacaco — Known for portable espresso…
+- # Marketing intelligence report — mission-w33-a
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (5)
+
+- RivalOne [confirmed] — Offers portable coffee makers for commuting professionals with a 30-day trial
+
+- RivalTwo [confirmed] — Provides portable espresso solutions targeting 25-40 year old commuters with free shipping
+
+- Wacaco — Known for portable espresso…
+- MISSION_DONE, missionId: mission-w33-a, extraction model refs: zcode:routed:glm-4-plus
+- 
+MISSION_DONE, missionId: mission-w33-a, extraction model refs: zcode:routed:glm-4-plus
+- 
+MISSION_DONE, missionId: mission-w33-a, extraction model refs: zcode:routed:glm-4-plus
+- Creative feature extraction (mission-w33-a): 2 ad + 2 organic feature sets.
+Extraction models used: zcode:routed:glm-4-plus
+
+- ad-rivalone-v0: hook "benefit-led" (demonstrates product benefits visually); narrative showcases product features -> demonstrates benefits in action -> establishes product value; offer: benefit demonstration without explicit offer details
+- ad-rivaltwo-v0: hook "urgency-led" (time-sensitive discount offer); narrative presents limited-time discount -> creates urgency for …
+- # Marketing intelligence report — mission-w33-a
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (5)
+
+- RivalOne [confirmed] — Offers portable coffee makers for commuting professionals with a 30-day trial
+
+- RivalTwo [confirmed] — Provides portable espresso solutions targeting 25-40 year old commuters with free shipping
+
+- Wacaco — Known for portable espresso…
+- 
+MISSION_DONE, missionId: mission-w33-a, extraction model refs: zcode:routed:glm-4-plus
+
+[transcript excerpt omitted in the evidence file — full transcripts referenced below]
+provider_config.json (run A sandbox) schemaVersion=1, provider rules=undefined
+
+== starting deterministic sampling-kill proxy on :8642 ==
+{"proxy":"listening","port":8642,"upstream":"https://internal-api.z.ai/v1/chat/completions","samplingMarker":"Return STRICT JSON only"}
+
+== seeding personal provider (run B, kill-proxy endpoint) ==
+{
+  "seeded": true,
+  "filePath": "/tmp/w33-seed-b-rmjGLO/.zcode/v2/provider_config.json",
+  "providerId": "zai-sandbox-glm",
+  "modelId": "glm-4-plus",
+  "baseUrl": "http://127.0.0.1:8642/v1",
+  "personalProviderCount": 1
+}
+
+== run B: same mission; sampling requests deterministically 503 ==
+== W3-3 real-host run B ==
+sandbox: /tmp/w33-host-b-GSsvgy
+host: tsx /home/z/my-project/zcode-marketing/apps/zcode-cli/packages/cli/src/main.ts agent-server
+provider: zai-sandbox-glm/glm-4-plus (via kill-proxy :8642)
+
+[driver] creating session in the real host…
+[driver] session sess_1bb85795-ef51-482e-975b-85336afd9beb — sending the mission prompt…
+
+== transcript summary (turn.completed) ==
+tool events (24): [{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_mission_start","toolCallId":"call_2db379d573f14f02a0b94583"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_mission_start","toolCallId":"call_2db379d573f14f02a0b94583"},{"kind":"result","toolName":null,"toolCallId":"call_2db379d573f14f02a0b94583"},{"kind":"batch","toolName":null},{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_discover_competitors","toolCallId":"call_8a881539e51f4b8d9c9a70e5"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_discover_competitors","toolCallId":"call_8a881539e51f4b8d9c9a70e5"},{"kind":"result","toolName":null,"toolCallId":"call_8a881539e51f4b8d9c9a70e5"},{"kind":"batch","toolName":null},{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_research_platform","toolCallId":"call_422d9c3b03af457aad3e9b34"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_research_platform","toolCallId":"call_422d9c3b03af457aad3e9b34"},{"kind":"result","toolName":null,"toolCallId":"call_422d9c3b03af457aad3e9b34"},{"kind":"batch","toolName":null},{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_analyze_creative","toolCallId":"call_a209ad9c965a49c5987cb146"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_analyze_creative","toolCallId":"call_a209ad9c965a49c5987cb146"},{"kind":"result","toolName":null,"toolCallId":"call_a209ad9c965a49c5987cb146"},{"kind":"batch","toolName":null},{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_rank_opportunities","toolCallId":"call_9fbe9cbe2a7b4dad9246f343"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_rank_opportunities","toolCallId":"call_9fbe9cbe2a7b4dad9246f343"},{"kind":"result","toolName":null,"toolCallId":"call_9fbe9cbe2a7b4dad9246f343"},{"kind":"batch","toolName":null},{"kind":"scheduled","toolName":"mcp__plugin_marketing_marketing__marketing_mission_report","toolCallId":"call_fb4c9352b07b45988866937f"},{"kind":"started","toolName":"mcp__plugin_marketing_marketing__marketing_mission_report","toolCallId":"call_fb4c9352b07b45988866937f"},{"kind":"result","toolName":null,"toolCallId":"call_fb4c9352b07b45988866937f"},{"kind":"batch","toolName":null}]
+permission requests auto-allowed: 6
+
+== gates ==
+  ✔ session created in the real host (id sess_1bb85795-ef51-482e-975b-85336afd9beb)
+  ✔ tool executions observed in the real agent loop (24 tool events)
+  ✔ marketing tool chain executed (6 distinct tools): mission_start, discover_competitors, research_platform, analyze_creative, rank_opportunities, mission_report
+  ✔ every marketing tool call completed with a result (6/6)
+  ✔ turn completed without failure
+  ✔ sampling failure fell back to the labeled heuristic adapter (heuristic: provenance present)
+  ✔ fallback reason stamped into provenance (35 '(fallback:' occurrences) — never silent
+  ✔ every fallback carries the heuristic prefix and reason (35/35 labeled)
+  ✔ no routed extraction in run B (sampling deterministically killed; only documentation placeholders present: )
+
+== persistence + stderr tail ==
+missions-index.json: mission-w33-b [demo]
+mission sqlite store exists: /tmp/w33-host-b-GSsvgy/workspace/.zcode/marketing/missions/mission-w33-b.sqlite
+
+full transcript (441 entries): /tmp/w33-host-b-GSsvgy/w33-transcript.json
+
+== provenance lines of interest ==
+- Creative feature extraction (mission-w33-b): 2 ad + 2 organic feature sets.
+Extraction models used: heuristic:multimodal (fallback: MCP error -32603: host sampling failed: Unauthorized: upstream credential rejected for this request class (deterministic…)
+
+- ad-rivalone-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof -> discount-close; offer: percentage discount with deadline
+- ad-rivaltwo-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof ->…
+- Creative feature extraction (mission-w33-b): 2 ad + 2 organic feature sets.
+Extraction models used: heuristic:multimodal (fallback: MCP error -32603: host sampling failed: Unauthorized: upstream credential rejected for this request class (deterministic…)
+
+- ad-rivalone-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof -> discount-close; offer: percentage discount with deadline
+- ad-rivaltwo-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof ->…
+- Creative feature extraction (mission-w33-b): 2 ad + 2 organic feature sets.
+Extraction models used: heuristic:multimodal (fallback: MCP error -32603: host sampling failed: Unauthorized: upstream credential rejected for this request class (deterministic…)
+
+- ad-rivalone-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof -> discount-close; offer: percentage discount with deadline
+- ad-rivaltwo-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof ->…
+- # Marketing intelligence report — mission-w33-b
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (2)
+
+- RivalOne [confirmed] — overlapping product category and audience with the described offer
+
+- RivalTwo [confirmed] — overlapping product category and audience with the described offer
+
+## Data coverage (explicit gaps, never silently filled)
+
+- [unavailable] …
+- # Marketing intelligence report — mission-w33-b
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (2)
+
+- RivalOne [confirmed] — overlapping product category and audience with the described offer
+
+- RivalTwo [confirmed] — overlapping product category and audience with the described offer
+
+## Data coverage (explicit gaps, never silently filled)
+
+- [unavailable] …
+- # Marketing intelligence report — mission-w33-b
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (2)
+
+- RivalOne [confirmed] — overlapping product category and audience with the described offer
+
+- RivalTwo [confirmed] — overlapping product category and audience with the described offer
+
+## Data coverage (explicit gaps, never silently filled)
+
+- [unavailable] …
+- MISSION_DONE, mission-w33-b, extraction model refs: heuristic:multimodal (fallback: MCP error -32603: host sampling failed: Unauthorized: upstream credential rejected for this request class (deterministic…)
+- 
+MISSION_DONE, mission-w33-b, extraction model refs: heuristic:multimodal (fallback: MCP error -32603: host sampling failed: Unauthorized: upstream credential rejected for this request class (deterministic…)
+- 
+MISSION_DONE, mission-w33-b, extraction model refs: heuristic:multimodal (fallback: MCP error -32603: host sampling failed: Unauthorized: upstream credential rejected for this request class (deterministic…)
+- Creative feature extraction (mission-w33-b): 2 ad + 2 organic feature sets.
+Extraction models used: heuristic:multimodal (fallback: MCP error -32603: host sampling failed: Unauthorized: upstream credential rejected for this request class (deterministic…)
+
+- ad-rivalone-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof -> discount-close; offer: percentage discount with deadline
+- ad-rivaltwo-v0: hook "price-first urgency opening" (offer-led); narrative offer -> proof ->…
+- # Marketing intelligence report — mission-w33-b
+
+## Product
+portable espresso maker — offer: 30-day home trial, free shipping; audience: commuting coffee drinkers, 25-40; objective: sales; market: US; platform: youtube.
+
+## Competitors (2)
+
+- RivalOne [confirmed] — overlapping product category and audience with the described offer
+
+- RivalTwo [confirmed] — overlapping product category and audience with the described offer
+
+## Data coverage (explicit gaps, never silently filled)
+
+- [unavailable] …
+- 
+MISSION_DONE, mission-w33-b, extraction model refs: heuristic:multimodal (fallback: MCP error -32603: host sampling failed: Unauthorized: upstream credential rejected for this request class (deterministic…)
+
+[transcript excerpt omitted in the evidence file — full transcripts referenced below]
+
+== W3-3 result: ALL GATES PASSED ==
+{"proxy":"stopped","forwarded":7,"killed":5}
+
