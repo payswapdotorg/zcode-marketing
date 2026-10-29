@@ -749,6 +749,12 @@ modules:
     managed: true
     requires:
       - marketing
+      # W3-3 real-host verification harness (scripts/w3-3-*) seeds the personal
+      # provider config through the production provider-config repository, so
+      # the harness needs the provider/provider-node public entrypoints. Dev-only
+      # dependency of the evidence scripts — never imported by dist/server.mjs.
+      - provider
+      - provider-node
     publicEntrypoints:
       - apps/zcode-cli/packages/marketing-plugin/src/index.ts
       - apps/zcode-cli/packages/marketing-plugin/src/contract.ts
