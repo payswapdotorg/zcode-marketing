@@ -1,0 +1,158 @@
+================================================================================
+W8-1 (WO-G1) — sandbox-reset prevention guard: suite + simulated integration run
+================================================================================
+Date: 2026-10-30 (UTC)  ·  all gates passed
+Wave: W8 (Phase 2 kickoff) · lane: platform · order: WO-G1 (see
+docs/marketing/PHASE2-HANDOFF.md section 5 and the W8-1 registry entry).
+
+Reproduce:
+  npx vitest run scripts/reset-guard/resetGuard.test.mjs --project fork-isolated
+    (20/20, maps 1:1 to AT-G1.1 … AT-G1.5)
+  node scripts/reset-guard/demo-incident-recovery.mjs
+    (the simulated integration run — replays the 2026-10-30 incident shape)
+  pnpm run reset-guard:pre-flight   (silent exit 0 on the in-sync workspace)
+  pnpm run architecture:check -- --changed
+
+--------------------------------------------------------------------------------
+0. The live event that opened W8 — the SECOND same-class sandbox reset, caught
+--------------------------------------------------------------------------------
+Session start of this wave found the workspace reset to `960a3bb4` (the same stale
+commit as the recorded 2026-10-30 incident) while origin/main held the completed
+W0..W7 state at `f2400d4d`: local behind 29 commits, 18,266 files reported modified —
+ALL of them mode-only noise (0 insertions, 0 deletions, binary tarball markers).
+Reconciliation per the standing policy: the completed remote state wins; zero local
+content changes existed, so nothing was ported and the mode-bit noise was discarded.
+git reset --hard origin/main; the tree is in-sync and clean since. Recorded in the
+WORK-REGISTRY change log (2026-10-30 row) and NOT silently — exactly the flow WO-G1
+now enforces mechanically.
+
+--------------------------------------------------------------------------------
+1. AT-G1 suite (unit + integration, hermetic real-git temp repositories)
+--------------------------------------------------------------------------------
+ RUN  v4.1.4 /home/z/my-project/zcode
+
+ ✓ |fork-isolated| scripts/reset-guard/resetGuard.test.mjs (20 tests) 1836ms
+
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+   Start at  10:51:26
+   Duration  2.05s (transform 56ms, setup 44ms, import 40ms, tests 1.84s, environment 0ms)
+
+--------------------------------------------------------------------------------
+2. Simulated integration run — the full incident-recovery protocol end to end
+--------------------------------------------------------------------------------
+
+=== incident state: local HEAD rewound; origin/main already at a8d11531b787 ===
+local HEAD     : 54feed4630acbdf5e92d7a61f2df4cac94440ce4
+origin/main    : a8d11531b7873f0b29e1eb7655e8a676a6b7797e
+
+=== 1. session-start pre-flight REFUSES the stale base (divergence report) ===
+reset-guard: PRE-FLIGHT REFUSED — stale base, no recorded reconciliation.
+local HEAD      : 54feed4630acbdf5e92d7a61f2df4cac94440ce4
+origin/main    : a8d11531b7873f0b29e1eb7655e8a676a6b7797e
+delta           : local 54feed4630ac vs origin/main a8d11531b787 — ahead 0, behind 1. incoming: a8d1153 shipped hardening on origin
+action          : reconcile explicitly (`node scripts/reset-guard/cli.mjs record-recovery --input <json>`)
+                  then reset to the completed remote state (`git merge --ff-only origin/main` or `git reset --hard origin/main`),
+                  commit the rendered registry row, and re-run the pre-flight.
+
+=== 2. work-order base assertion refuses on the rewound workspace ===
+reset-guard: work order WO-G1 was accepted on base a8d11531b787 but HEAD is now 54feed4630ac — the sandbox may have been reset. Current state: local 54feed4630ac vs origin/main a8d11531b787 — ahead 0, behind 1. incoming: a8d1153 shipped hardening on origin. Reconcile explicitly (record-recovery) or re-bind the order on the new base.
+
+=== 3. record-recovery validates the event and renders the registry row ===
+recorded: recon-2026-10-30T093000000Z-1
+
+registry change-log row (commit into WORK-REGISTRY.md):
+**Sandbox-reset recovery event recon-2026-10-30T093000000Z-1 (recorded 2026-10-30T10:51:28.752Z).** Detection time: 2026-10-30T09:30:00.000Z. Local state: `54feed4630ac` — remote state (`origin/main`): `a8d11531b787`. Divergence summary: simulated 2026-10-30 incident shape: workspace reset to an old commit while origin/main held the completed implementation; local behind by 1 (shipped hardening on origin), no local content changes Decision: completed remote state wins (no verified-additive local improvement exists) Ported items: none Discarded-work inventory: none — the rewound workspace held no local content changes
+
+=== 4. the recorded reconciliation unblocks the guards (explicit escape hatch) ===
+pre-flight: PASS (reconciliation recon-2026-10-30T093000000Z-1 explicitly covers this divergence)
+assert WO-G1: PASS (reconciliation recon-2026-10-30T093000000Z-1 covers a8d11531b787 → 54feed4630ac)
+
+=== 5. reconcile to the completed remote state, bind, checkpoint round-trip ===
+checkpoint written (schema v1):
+{
+  "schemaVersion": 1,
+  "repositoryUrl": "/tmp/reset-guard-demo-Zfixvg/origin.git",
+  "head": "a8d11531b7873f0b29e1eb7655e8a676a6b7797e",
+  "branch": "main",
+  "dirtyFiles": [],
+  "openWorkOrders": [
+    {
+      "id": "WO-G1",
+      "base": "a8d11531b7873f0b29e1eb7655e8a676a6b7797e",
+      "boundAt": "2026-10-30T10:51:28.740Z"
+    },
+    {
+      "id": "WO-G2",
+      "base": "a8d11531b7873f0b29e1eb7655e8a676a6b7797e",
+      "boundAt": "2026-10-30T10:51:28.768Z"
+    }
+  ],
+  "writtenAt": "2026-10-30T11:00:00.000Z"
+}
+
+checkpoint read round-trip: OK
+
+=== 6. clean state: guards pass SILENTLY (AT-G1.5) — no output above the PASS lines ===
+pre-flight exit: 0 (report: SILENT)
+guard-push exit: 0 (stdout: "")
+
+=== DEMO COMPLETE — all six protocol steps executed ===
+
+--------------------------------------------------------------------------------
+3. Checkpoint JSON schema (v1) + a persisted sample
+--------------------------------------------------------------------------------
+Fields (validated on write AND read; unknown fields and wrong types rejected):
+  schemaVersion: 1
+  repositoryUrl: string (origin remote URL)
+  head: string, full 40-char commit sha
+  branch: string
+  dirtyFiles: array of file-path strings (guard's own state excluded)
+  openWorkOrders: array of { id, base (40-char sha), boundAt (ISO-8601) }
+  writtenAt: ISO-8601 timestamp
+
+A sample checkpoint as written by `cli.mjs checkpoint write` in the demo (step 5) —
+the read round-trip compares equal.
+
+--------------------------------------------------------------------------------
+4. Sample recovery-event registry entry (rendered by `record-recovery`)
+--------------------------------------------------------------------------------
+**Sandbox-reset recovery event recon-2026-10-30T093000000Z-1 (recorded 2026-10-30T10:51:28.752Z).** Detection time: 2026-10-30T09:30:00.000Z. Local state: `54feed4630ac` — remote state (`origin/main`): `a8d11531b787`. Divergence summary: simulated 2026-10-30 incident shape: workspace reset to an old commit while origin/main held the completed implementation; local behind by 1 (shipped hardening on origin), no local content changes Decision: completed remote state wins (no verified-additive local improvement exists) Ported items: none Discarded-work inventory: none — the rewound workspace held no local content changes
+
+--------------------------------------------------------------------------------
+5. AT-G1.5 — clean-state friction and overhead (live, this workspace)
+--------------------------------------------------------------------------------
+The suite asserts the full five-command clean-path chain (pre-flight, guard-push,
+bind, assert, checkpoint write+read in one process) completes in < 1000 ms and that
+both guards pass at CLI level with EMPTY stdout. Live invocations on this workspace
+(node scripts/reset-guard/cli.mjs <cmd> --no-fetch):
+  live pre-flight (in-sync, silent pass, exit 0): 39 ms
+  live guard-push (pre-commit workspace, dirty by this slice's own changes):
+    reset-guard: PUSH REFUSED — working tree is dirty (7 file(s)); commit or stash before pushing. Offending files:
+      - .github/workflows/ci.yml
+      - .gitignore
+      - AGENTS.md
+      - package.json
+      - vitest.config.ts
+      - docs/marketing/evidence/2026-10-30-w8-wo-g1-reset-guard.txt
+      - scripts/reset-guard/
+
+The refusal above is the guard working as specified on the real workspace mid-slice:
+AT-G1.2 behavior, live. After the W8-1 commits land, the same command passes silently
+(the push itself proves it — the husky verify:pre-push chain now begins with
+reset-guard:pre-push).
+
+--------------------------------------------------------------------------------
+6. Gate summary (this slice)
+--------------------------------------------------------------------------------
+reset-guard AT suite: 20/20 (fork-isolated project, in the required root unit gate)
+oxlint scripts/reset-guard/: 0 warnings, 0 errors (94 rules, 4 files)
+architecture:check --changed: 0 violations (base merge-base upstream origin/main)
+marketing-plugin vitest: 59/59 after the standard pnpm build (dist/panel.html +
+  dist/server.mjs are build products; the suite reads the built dists)
+db:schema:check: compatible · test:architecture: green
+reset-guard:pre-flight on this workspace: silent exit 0 (in-sync after the
+  reconciliation recorded in section 0)
+CI: the suite runs inside the required unit gate on every run; the unit job also
+  carries the explicit `Reset-guard pre-flight (WO-G1)` step; husky verify:pre-push
+  now begins with `pnpm run reset-guard:pre-push`.

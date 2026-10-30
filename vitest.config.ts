@@ -55,6 +55,10 @@ const forkIsolatedTests = [
   // 波及面收敛到本文件，其余测试结果可完整收集；崩溃根因见
   // docs/windows-test-compatibility.md。
   "packages/ui/test/pdfJsCMapSupport.test.ts",
+  // WO-G1 沙箱重置防护套件（scripts/reset-guard/）：每个用例都会在临时目录里连
+  // 续 init/clone/fetch 真实 Git 仓库；沿用本组「真实 Git 子进程串行隔离」的既有
+  // 口径，避免与全量并发 run 的进程启动互相挤压。
+  "scripts/reset-guard/resetGuard.test.mjs",
 ];
 
 export default defineConfig({
@@ -119,6 +123,9 @@ export default defineConfig({
             "packages/services/src/gen-ui/**/*.test.ts",
             "scripts/assert-safe-cua-helper-zip.test.mjs",
             "scripts/ci/ci-telemetry-keyword-guard.test.mjs",
+            // WO-G1 沙箱重置防护（scripts/reset-guard/）：按文件显式纳入根套件；
+            // 同时列于 forkIsolatedTests，实际执行在串行 fork 池（真实 Git 集成）。
+            "scripts/reset-guard/resetGuard.test.mjs",
           ],
           exclude: ["packages/desktop/test/e2e/**", "packages/zcode-cua/**", ...forkIsolatedTests],
           // Node 24/macOS 的 threads 全量运行可触发 V8 SIGSEGV；诊断时切换进程隔离，测试范围不变。

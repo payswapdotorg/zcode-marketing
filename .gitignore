@@ -75,3 +75,8 @@ packages/desktop/resources/macos-window-bounds/
 __pycache__/
 *.pyc
 .zcode-runtime
+
+# WO-G1 sandbox-reset prevention guard (scripts/reset-guard/): local machine state only —
+# checkpoints, work-order base bindings, reconciliation records. The evidence trail of a
+# reconciliation is its committed WORK-REGISTRY row, not this directory.
+.reset-guard/

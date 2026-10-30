@@ -7,7 +7,7 @@
 
 ## 命令与仓库结构
 
-开工前运行 `node scripts/check-workspace-freshness.mjs` 检查基线。Node 版本以 `mise.toml` 为准。
+开工前运行 `node scripts/check-workspace-freshness.mjs` 检查基线，并运行 `pnpm run reset-guard:pre-flight`（WO-G1 沙箱重置防护：本地 HEAD 落后 origin/main 且无已记录的对账时直接拒绝开工；2026-10-30 同类沙箱重置事故已发生两次，防护细节见 `scripts/reset-guard/README.md`）。接受工单时用 `node scripts/reset-guard/cli.mjs bind --wo <ID>` 绑定基线提交，写代码前用 `assert --wo <ID>` 复核。Node 版本以 `mise.toml` 为准。
 
 以下命令从仓库根目录执行：
 

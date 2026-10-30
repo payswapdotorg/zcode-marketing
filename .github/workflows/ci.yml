@@ -111,6 +111,13 @@ jobs:
       - name: Build CLI workspace (turbo)
         working-directory: apps/zcode-cli
         run: node ../../node_modules/.bin/turbo run build --concurrency=2
+      # WO-G1 sandbox-reset prevention guard (Phase 2, W8): the guard suite itself runs
+      # inside the required root unit suite below (fork-isolated project, real temp git
+      # repositories). This explicit pre-flight step additionally exercises the guard CLI
+      # against the CI checkout itself — a workspace-vs-origin sanity gate with a visible,
+      # named CI presence, and the exit code blocks the job on any divergence.
+      - name: Reset-guard pre-flight (WO-G1)
+        run: pnpm run reset-guard:pre-flight
       # The root unit suite imports @zcode/e2e-report BY PACKAGE NAME (its exports point
       # at dist-node), so its build product must exist before the suite runs — it is the
       # only dist-dependent root-suite import (validated: 2050/2054 files passed without
