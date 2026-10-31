@@ -1,0 +1,29 @@
+{
+  "note": "SAMPLE SHAPE generated from the wire-accurate mock (environment=mock). The manual run replaces this with the production export.",
+  "exportedAt": "2026-10-30T21:28:45.896Z",
+  "connections": [
+    {
+      "channelId": "UCmockChannelId0000000000000000",
+      "channelTitle": "Sample Artifact Shape (mock)",
+      "environment": "production",
+      "degraded": false,
+      "connectedAt": "2026-10-30T21:28:45.896Z",
+      "updatedAt": "2026-10-30T21:28:45.896Z"
+    }
+  ],
+  "auditLog": [
+    {
+      "ts": "2026-10-30T21:28:45.894Z",
+      "action": "save-pending"
+    },
+    {
+      "ts": "2026-10-30T21:28:45.894Z",
+      "action": "take-pending"
+    },
+    {
+      "ts": "2026-10-30T21:28:45.896Z",
+      "action": "connection-created",
+      "channelId": "UCmockChannelId0000000000000000"
+    }
+  ]
+}

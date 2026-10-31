@@ -80,3 +80,10 @@ __pycache__/
 # checkpoints, work-order base bindings, reconciliation records. The evidence trail of a
 # reconciliation is its committed WORK-REGISTRY row, not this directory.
 .reset-guard/
+
+# WO-P1 production OAuth (tools/youtube-oauth/): the encrypted token store and the
+# AES-256-GCM key never enter the repository — under any name, in any location.
+# Default store location is ./.youtube-oauth/store.json; keyfiles are passed by path.
+.youtube-oauth/
+**/store.json*
+*.key

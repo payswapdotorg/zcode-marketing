@@ -1,0 +1,37 @@
+# WO-P1 credentials-free suite — CI job addition.
+#
+# Per the work order: "Token-hygiene tests remain in the credentials-free
+# suite." This job runs the whole youtube-oauth suite (including token
+# hygiene) against the built-in wire-accurate mock. No secrets, no network.
+#
+# Add alongside the reset-guard job (WO-G1) and the four existing jobs; make
+# it a required check while WO-P1..P3 are open.
+
+  youtube-oauth:
+    name: youtube-oauth (WO-P1, credentials-free)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run the WO-P1 credentials-free suite (wire-accurate mock)
+        run: node --test --test-reporter=spec "tools/youtube-oauth/test/*.test.mjs"
+
+      - name: Token-hygiene summary
+        if: always()
+        run: |
+          {
+            echo "## youtube-oauth summary (credentials-free)"
+            echo '```'
+            node --test --test-reporter=tap "tools/youtube-oauth/test/*.test.mjs" 2>&1 | grep -E '^# (tests|pass|fail)' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+# Branch protection: add "youtube-oauth (WO-P1, credentials-free)" to the
+# required status checks for main.
+#
+# Credentialed acceptance (real Google consent) NEVER runs in CI — it is the
+# TL's recorded manual run per docs/manual-run-runbook.md (handoff Section 9.5).

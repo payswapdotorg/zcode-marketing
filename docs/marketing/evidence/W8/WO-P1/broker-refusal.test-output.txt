@@ -1,0 +1,38 @@
+# WO-P1 AT-P1.4 — broker-refusal test output (CI artifact pointer)
+# Staged: 2026-10-31 — this file occupies its fixed manifest slot (execution plan
+# Phase 7 artifact table) so the closure entry can be written against the name now.
+# AT-P1.4 is CLOSED credentials-free: the proof below is the suite output of the
+# same test the CI job (docs/marketing/ci/youtube-oauth-ci.snippet.yml) runs on every push.
+# CI run URL: PENDING-AT-PUSH — filled when the WO-P1 package lands and the
+# youtube-oauth job first runs; until then the local run below is the record.
+
+## What the test proves
+
+Test: "AT-P1.4 — a write-scope operation without permission-broker approval is
+refused with zero side effects" — tools/youtube-oauth/test/oauth.test.mjs
+(run inside the credentials-free suite against the wire-accurate mock provider).
+
+The refusal path is asserted on all three effects, not just the refusal message:
+no store mutation (store file byte-identical after the denied call), no API call
+(0 write calls observed at the provider), no state change — plus a positive
+control: the same operation proceeds when a permission-broker approval exists.
+
+## Reproduce anywhere (Node >= 18, credentials-free)
+
+node --test --test-reporter=spec "tools/youtube-oauth/test/*.test.mjs"
+
+(quoted glob — `node --test` does not expand directory arguments on Node 24)
+
+## The recorded output
+
+From docs/marketing/evidence/W8/WO-P1/credentials-free-suite-output.txt (generated
+2026-10-30T21:28:45Z, re-verified fresh 2026-10-31 — 9/9 pass):
+
+[AT-P1.4] broker denial: refused, 0 API write calls, store byte-identical; approval path proceeds (positive control)
+  ✔ AT-P1.4 — a write-scope operation without permission-broker approval is refused with zero side effects (8.130273ms)
+
+## Optional manual re-confirm at Phase 4–6 (runbook step 5)
+
+node tools/youtube-oauth/cli.mjs upload ...
+# without an approvals file it must refuse with "No permission-broker approval"
+# and exit code 3 — the same zero-side-effect path, against production.

@@ -1,0 +1,18 @@
+{
+  "note": "SAMPLE SHAPE from the mock run. The audit log never contains token material (proven by the token-hygiene test).",
+  "entries": [
+    {
+      "ts": "2026-10-30T21:28:45.894Z",
+      "action": "save-pending"
+    },
+    {
+      "ts": "2026-10-30T21:28:45.894Z",
+      "action": "take-pending"
+    },
+    {
+      "ts": "2026-10-30T21:28:45.896Z",
+      "action": "connection-created",
+      "channelId": "UCmockChannelId0000000000000000"
+    }
+  ]
+}

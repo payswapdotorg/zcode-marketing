@@ -150,6 +150,62 @@ jobs:
         working-directory: apps/zcode-cli/packages/marketing-plugin
         run: pnpm exec vitest run
 
+  # WO-P1 (W8-2) credentials-free suite — spec: docs/marketing/ci/youtube-oauth-ci.snippet.yml.
+  # Per the work order: "Token-hygiene tests remain in the credentials-free suite."
+  # The whole youtube-oauth suite (consent/exchange/refresh+rotation, store redaction,
+  # idempotent re-auth, broker refusal, degraded state) runs against the built-in
+  # wire-accurate mock: no secrets, no network, no pnpm install (node: builtins only,
+  # same zero-dependency constraint as scripts/reset-guard). Runner and Node version
+  # are aligned to the repo pins (ubuntu-24.04 / Node 24); the check name matches the
+  # snippet so branch protection can require it while WO-P1..P3 are open.
+  youtube-oauth:
+    name: youtube-oauth (WO-P1, credentials-free)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run the WO-P1 credentials-free suite (wire-accurate mock)
+        run: node --test --test-reporter=spec "tools/youtube-oauth/test/*.test.mjs"
+      - name: Token-hygiene summary
+        if: always()
+        run: |
+          {
+            echo "## youtube-oauth summary (credentials-free)"
+            echo '```'
+            node --test --test-reporter=tap "tools/youtube-oauth/test/*.test.mjs" 2>&1 | grep -E '^# (tests|pass|fail)' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # WO-P1 (W8-2) cred-hygiene — spec: docs/marketing/ci/cred-hygiene-ci.snippet.yml.
+  # The canary redaction scanner's own suite. Credentials-free by construction (every
+  # secret-shaped string in the tests is a CANARY-marked generated value); this is the
+  # artifact-level complement to the youtube-oauth token-hygiene tests: it proves the
+  # stored artifacts of any run scan clean and that its own reports never leak what
+  # they find (meta-redaction, CH-5/CH-6).
+  cred-hygiene:
+    name: cred-hygiene (WO-P1 redaction scanner)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run the cred-hygiene suite (canary redaction scanner)
+        run: node --test --test-reporter=spec "tools/cred-hygiene/test/*.test.mjs"
+      - name: Scanner selfcheck summary
+        if: always()
+        run: |
+          {
+            echo "## cred-hygiene summary"
+            echo '```'
+            node tools/cred-hygiene/cli.mjs selfcheck
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   desktop-e2e:
     name: desktop e2e (electron, container, replay-isolated)
     runs-on: ubuntu-24.04

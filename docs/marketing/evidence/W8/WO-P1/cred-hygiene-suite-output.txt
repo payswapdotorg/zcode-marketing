@@ -1,0 +1,29 @@
+# cred-hygiene suite output — canary redaction scanner (WO-P1 Phase 3 tooling)
+# Generated: 2026-10-30T21:28:45Z
+# Reproduce: node --test --test-reporter=spec "tools/cred-hygiene/test/*.test.mjs"
+# Node v24.22.1. CH-5/CH-6 are the meta-redaction guarantee: the
+# scanner's own reports never contain what they find.
+
+✔ CH-1 — canary exact-value detection finds every registered value with location (3.860584ms)
+✔ CH-2 — pattern classes detect unregistered credential shapes (0.891664ms)
+✔ CH-3 — clean path: exit 0, zero stdout (silent) (27.075289ms)
+✔ CH-4 — findings: exit 3 and a REFUSED report on stdout (29.811975ms)
+✔ CH-5 — meta-redaction: the report file itself scans clean (R9 core invariant) (62.665958ms)
+✔ CH-6 — report text contains no canary value and no full pattern value (27.432883ms)
+✔ CH-7 — canary generation: deterministic, CANARY-marked, class-shaped (0.762862ms)
+✔ CH-8 — binary and oversized files are skipped with notes, not crashed (1.074405ms)
+✔ CH-9 — directory recursion with default ignores and --exclude (1.339338ms)
+✔ CH-10 — canary loading forms and validation (0.476634ms)
+✔ CH-11 — usage errors exit 2 (201.833976ms)
+✔ CH-12 — structured report schema is stable and complete (31.430398ms)
+✔ CH-13 — clean run with --out writes a clean report and stays silent on stdout (34.172207ms)
+✔ CH-14 — selfcheck passes end-to-end (27.121298ms)
+✔ CH-15 — verbose clean scan prints the summary; pattern list is documented (33.444158ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 546.299982

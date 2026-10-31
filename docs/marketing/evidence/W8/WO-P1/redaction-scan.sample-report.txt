@@ -1,0 +1,14 @@
+# Sample redaction-scan report — a real refusal, recorded (negative control)
+# Generated: 2026-10-30T21:28:46Z by gen-wo-p1-cred-hygiene-evidence.sh
+# Scenario: simulated leaky manual-run artifacts (one canary access token, one
+# canary refresh token, one unregistered ya29. shape). The scanner refused
+# (exit 3). This file is the stored artifact of that refusal.
+# Meta check: this report itself scans clean under the same canaries (exit 0).
+
+REFUSED: 5 finding(s) — redaction failure (exit 3)
+  /tmp/cred-hygiene-evidence-x19IXG/manual/acceptance-run.log:3:51  class=canary:access-token  len=37
+  /tmp/cred-hygiene-evidence-x19IXG/manual/acceptance-run.log:3:51  class=access-token  len=37  preview=ya2…
+  /tmp/cred-hygiene-evidence-x19IXG/manual/acceptance-run.log:5:52  class=access-token  len=43  preview=ya2…
+  /tmp/cred-hygiene-evidence-x19IXG/manual/notes.txt:1:34  class=canary:refresh-token  len=34
+  /tmp/cred-hygiene-evidence-x19IXG/manual/notes.txt:1:34  class=refresh-token  len=34  preview=1//…
+scan: 3 file(s) scanned, 0 skipped, 5 canary value(s), 5 pattern class(es)

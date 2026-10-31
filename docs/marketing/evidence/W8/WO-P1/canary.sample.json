@@ -1,0 +1,22 @@
+[
+  {
+    "class": "access-token",
+    "value": "ya29.a0CANARYbZM1pgbnVRLRmTD6bpNWRO15"
+  },
+  {
+    "class": "refresh-token",
+    "value": "1//0CANARYEHu1iJLgpwaJlybDBkNLrWzh"
+  },
+  {
+    "class": "client-secret",
+    "value": "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Rk"
+  },
+  {
+    "class": "api-key",
+    "value": "AIzaCANARYlxdkmcayFnejQBknXrbrxoFnI6hE"
+  },
+  {
+    "class": "opaque",
+    "value": "CANARY-RUTvaPV1E3T7jNdxvoeFbk2LH5byqqW8"
+  }
+]

@@ -1,0 +1,35 @@
+# WO-P1 Phase 3 tooling — cred-hygiene CI job addition.
+#
+# The canary redaction scanner's own suite. Credentials-free by construction:
+# every secret-shaped string in the tests is a CANARY-marked generated value.
+# This is the artifact-level complement to the youtube-oauth token-hygiene
+# tests (which prove the code paths); cred-hygiene proves the stored artifacts
+# of any run scan clean, and that its own reports never leak what they find.
+#
+# Add alongside reset-guard (WO-G1) and youtube-oauth (WO-P1) jobs.
+
+  cred-hygiene:
+    name: cred-hygiene (WO-P1 redaction scanner)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run the cred-hygiene suite (canary redaction scanner)
+        run: node --test --test-reporter=spec "tools/cred-hygiene/test/*.test.mjs"
+
+      - name: Scanner selfcheck summary
+        if: always()
+        run: |
+          {
+            echo "## cred-hygiene summary"
+            echo '```'
+            node tools/cred-hygiene/cli.mjs selfcheck
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+# Branch protection: add "cred-hygiene (WO-P1 redaction scanner)" to the
+# required status checks for main while WO-P1..P3 are open.
