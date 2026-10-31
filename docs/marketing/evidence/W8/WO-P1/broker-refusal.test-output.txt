@@ -3,8 +3,10 @@
 # Phase 7 artifact table) so the closure entry can be written against the name now.
 # AT-P1.4 is CLOSED credentials-free: the proof below is the suite output of the
 # same test the CI job (docs/marketing/ci/youtube-oauth-ci.snippet.yml) runs on every push.
-# CI run URL: PENDING-AT-PUSH — filled when the WO-P1 package lands and the
-# youtube-oauth job first runs; until then the local run below is the record.
+# CI run URL: https://github.com/payswapdotorg/zcode-marketing/actions/runs/41159051465
+# (landing commit 18c72434 — the youtube-oauth job ran the suite below green on
+# its first run, 2026-10-31; job "youtube-oauth (WO-P1, credentials-free)",
+# 9/9, together with cred-hygiene 15/15 in the same run's sibling job).
 
 ## What the test proves
 

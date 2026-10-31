@@ -15,7 +15,7 @@ explicit and nothing is invented in their place.
 
 | # | Field | Value | Source / note |
 |---|---|---|---|
-| 1.1 | Brand account that completes consent (Google account identity) | `PENDING-TL-INPUT` | Storage rule: the account email is redacted to its domain in all stored artifacts; full identity lives only in the run environment |
+| 1.1 | Brand account that completes consent (Google account identity) | ✅ **provided by the TL 2026-10-31** (round instructions: "use my google account") — a `gmail.com` Google account, the payswap-org account that owns the project's other assets | Storage rule: the account email is redacted to its domain in all stored artifacts; full identity lives only in the run environment |
 | 1.2 | Target channel the account owns (expected title; channel ID confirmed by the Phase 5 health check — never assumed) | `PENDING-TL-INPUT` | The health check's returned channel ID is the verified identity that lands in the connection record |
 | 1.3 | Google Cloud project ID hosting the OAuth client | `PENDING-TL-INPUT` | Project ID is not a secret |
 | 1.4 | OAuth client ID and client type (web / desktop) | `PENDING-TL-INPUT` | Client ID is not a secret and is recorded in full once provided; the client secret never enters any artifact |
@@ -38,6 +38,7 @@ explicit and nothing is invented in their place.
 | 3.2 | Capture tooling for the consent-flow record | screen recording preferred, screenshots minimum; capture starts **before** the consent screen opens (plan Phase 4 step 1) | executor-confirmed at staging |
 | 3.3 | Consent window 1 (initial consent + exchange + refresh + health check) | `PENDING-TL-INPUT` — date/time with the account owner available | A few minutes of the owner's time |
 | 3.4 | Consent window 2 (provider-side revocation + re-authorization, AT-P1.5 + AT-P1.3) | `PENDING-TL-INPUT` — date/time, after window 1 | Same owner; revocation happens at the Google account permissions page during this window |
+| 3.5 | **Account-path verification (executed 2026-10-31, post-landing):** automated-browser sign-in from the executor sandbox vs. network endpoints | **finding recorded — the browser path is blocked, the API path is open** | (a) One controlled sign-in attempt (stop-on-challenge policy, no retries, no workarounds) was **refused by Google at the email step**: "This browser or app may not be secure. Try using a different browser." — Google Accounts blocks automation browsers; the consent click can therefore NOT be automated from this sandbox. (b) Network reachability from the same sandbox: `POST https://oauth2.googleapis.com/token` responds (HTTP 400 on an empty body — endpoint processing), Data API v3 discovery `HTTP 200` — the exchange, refresh, and health-check half of Phase 4 runs fine executor-side. **Consequence for the runbook (step 3):** the consent URL must be opened in the OWNER'S browser (or any human-operated trusted browser), and the `code` copied from the redirect URL back to the executor — the localhost-redirect design already supports exactly this division; runbook note added 2026-10-31 |
 
 ## 4. Guard protocol state (Phase 0.2)
 

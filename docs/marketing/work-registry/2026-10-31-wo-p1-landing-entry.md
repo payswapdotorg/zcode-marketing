@@ -6,7 +6,7 @@
 | Entry type | repository landing (the package's commit-plan steps 1–2); NOT a closure entry — Phases 4–6 (manual credentialed runs) remain, blocked on TL inputs |
 | Executor | Z.ai GLM agent — platform lane, Phase 2 executor session |
 | Base commit | `9b3ea79a` — bound via `reset-guard bind` 2026-10-31; `assert` before writes; checkpoint written |
-| Landing commit | `PENDING-AT-PUSH` — filled by the follow-up registry row immediately after the push |
+| Landing commit | `18c72434` — feat(oauth): add production YouTube connection stack (WO-P1, credentials-free); 37 files, +4,254/−1 |
 | Dependencies | WO-G1 ✅ landed `1ece86fb` (entry condition 0.1 satisfied; guard suite 20/20 in the required unit gate; all four gates green on runs 41044065124 and 41047832700) |
 
 ## What landed
@@ -29,7 +29,7 @@ repository-absolute ones:
 | Credentials-free suite — 9/9, AT-tagged | `tools/youtube-oauth/test/oauth.test.mjs` |
 | Canary redaction scanner (exact-value + 5 pattern classes) | `tools/cred-hygiene/cred-hygiene.mjs`, `tools/cred-hygiene/cli.mjs` |
 | Scanner suite — 15/15 incl. meta-redaction CH-5/CH-6 | `tools/cred-hygiene/test/cred-hygiene.test.mjs` |
-| Phase 1 inputs register (15 `PENDING-TL-INPUT` fields) | `docs/marketing/evidence/W8/WO-P1/inputs-register.md` |
+| Phase 1 inputs register (14 `PENDING-TL-INPUT` fields remain after the TL provided the brand account, §1.1) | `docs/marketing/evidence/W8/WO-P1/inputs-register.md` |
 | Phase 2 verification ledger (V1–V5 answered, 23 sources) | `docs/marketing/evidence/W8/WO-P1/verification-ledger.md` |
 | Scope justification (least-privilege confirmation) | `docs/marketing/scope-justification.md` |
 | Manual-run runbook (steps 0–8, console checklist, D2(a) sequencing) | `docs/marketing/manual-run-runbook.md` |
@@ -56,8 +56,23 @@ require them while WO-P1..P3 are open):
 
 Runner/node aligned to the repo pins (ubuntu-24.04, Node 24); the suites are
 zero-dependency (node: builtins only), so no install step — same constraint as
-`scripts/reset-guard`. First green run URL on the landing commit:
-`PENDING-AT-PUSH` — recorded in the follow-up row.
+`scripts/reset-guard`.
+
+**CI ACCEPTED for W8-2 — run 41159051465, commit `18c72434`, all six gates
+green (2026-10-31):** governance · typecheck · unit (complete root suite
+19,956 passed | 21 skipped across 2,053 files passed | 2 skipped, with the
+reset-guard suite inside the required gate and the `Reset-guard pre-flight
+(WO-G1)` step passing; then bootstrap 47/47, adapters 79/79, marketing-plugin
+59/59) · **youtube-oauth 9/9 (first run)** · **cred-hygiene 15/15 + selfcheck
+(first run)** · desktop-e2e (replay-isolated container). Every count above is
+from that run's logs.
+
+Branch-protection note (honest finding, 2026-10-31): `main` currently has **no
+branch-protection rules** — no check is formally "required" in the GitHub
+sense; enforcement is the husky pre-push chain (guard-push first) plus the fact
+that every push runs the full six-gate workflow. Making the six checks
+formally required (the snippets' recommendation while WO-P1..P3 are open) is a
+repo-admin action recorded here for the TL.
 
 ## Pre-landing redaction scan (the landed scanner, run on the landed tree)
 
@@ -114,11 +129,35 @@ recovery executed **through** the guard's own escape hatch rather than beside it
   `docs/marketing/evidence/W8/WO-P1/manual/` outside CI, scanned by cred-hygiene
   before storage (runbook step 7).
 
+## Post-landing account-path verification (Phase 1's account-path objective)
+
+With the landing green, the round executed the account-path confirmation the
+plan's Phase 1 calls for, using the brand Google account the TL provided in
+this round's instructions (inputs register §1.1 — filled, redacted to its
+domain per the storage rule):
+
+- **Browser path: BLOCKED, recorded as a negative result.** One controlled
+  sign-in attempt from the executor sandbox's automation browser (explicit
+  stop-on-challenge policy: no retries, no workarounds, password never written
+  to any file) was refused by Google at the email step: *"This browser or app
+  may not be secure. Try using a different browser."* Google Accounts blocks
+  automation browsers — the consent click cannot be automated from this
+  sandbox. The runbook's step 3 now carries this note: the consent URL opens
+  in the **owner's** browser; the owner copies the `code` from the redirect
+  address bar; the executor CLI does exchange/health-check/storage/scan.
+- **API path: OPEN.** From the same sandbox, `POST
+  https://oauth2.googleapis.com/token` responds (HTTP 400 on an empty body —
+  the endpoint is processing) and Data API v3 discovery returns HTTP 200 —
+  the exchange, refresh, and health-check half of Phase 4 runs fine
+  executor-side.
+- Full record: inputs register §3.5; runbook step 3 note.
+
 ## What is still open
 
-1. TL inputs (inputs register §1–3 — 15 `PENDING-TL-INPUT` fields): brand
-   account + channel, OAuth client details, test-user basis, consent windows,
-   console-indicated scope classification.
+1. TL inputs (inputs register §1–3 — 14 `PENDING-TL-INPUT` fields after the
+   TL provided the brand Google account on 2026-10-31, §1.1): target channel,
+   OAuth client details, test-user basis, consent windows, console-indicated
+   scope classification.
 2. Decision D2 (testing-mode 7-day refresh-token clock): flip between the two
    consent runs (recommended) or accept re-consent cadence.
 3. R1 app-verification decision (with the recorded exceptions context).

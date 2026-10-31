@@ -80,6 +80,17 @@ brand's channel**, approve the requested scopes (youtube.upload,
 youtube.readonly, yt-analytics.readonly), then copy the `code` parameter from
 the redirect URL.
 
+**Whose browser (recorded finding, 2026-10-31):** this must be the owner's
+browser or any human-operated trusted browser — **not** an automated browser in
+the executor sandbox. A controlled sign-in attempt from the sandbox's
+automation browser was refused by Google at the email step ("This browser or
+app may not be secure"); Google Accounts blocks automation browsers, so the
+consent click cannot be automated. The division of labor the localhost-redirect
+design already supports: the owner opens the consent URL and copies the `code`
+from the redirect address bar; the executor CLI (running in the sandbox, where
+the token and Data API endpoints are verified reachable) performs the exchange,
+health check, storage, and redaction scan.
+
 Capture note: while the app is in Testing mode, Google shows the test-user
 warning before the authorization ("a warning message… confirms the user has
 test access to your project but should consider the risks associated with
