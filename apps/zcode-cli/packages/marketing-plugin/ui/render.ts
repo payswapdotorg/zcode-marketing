@@ -7,7 +7,7 @@
  * badged, every evidence row shows provenance. Actions are injected by the app
  * module (ui/panel.ts) so this file stays free of host-connection concerns.
  */
-import { OBJECTIVES, type MissionEntry } from "./types.ts";
+import { OBJECTIVES, type MissionEntry, type NoObservation, type Signal } from "./types.ts";
 import { S, STATE_CLASS, esc, num, selectedBrief, selectedMission, setHtml } from "./state.ts";
 import { renderCreative, wireCreative } from "./creative.ts";
 import { renderLoop, wireLoop } from "./loop.ts";
@@ -125,6 +125,67 @@ function renderMission(): string {
     ${S.tab === "report" ? renderReport(entry) : S.tab === "evidence" ? renderEvidence() : S.tab === "creative" ? renderCreative() : renderLoop()}`;
 }
 
+// ---------------------------------------------------------------------------
+// WO-P5 — explicit absence + point-of-use coverage disclosure (handoff §11)
+// ---------------------------------------------------------------------------
+
+/** Localized label for a noObservation reason (WO-P5 §2 contract enum). */
+const noObservationReasonLabel = (reason: NoObservation["reason"]): string =>
+  reason === "before_coverage"
+    ? S.strings.reasonBeforeCoverage
+    : reason === "insufficient_window"
+      ? S.strings.reasonInsufficientWindow
+      : S.strings.reasonNotObserved;
+
+/**
+ * AT-P5.2 (panel side): a signal with neither velocity nor total states its
+ * absence explicitly — never a blank row, never a zero, never an interpolated
+ * value. Older report shapes without the field get the honest fallback
+ * wording instead of an inferred reason; a valued signal renders no chip.
+ * Absence is a normal state, so the chip keeps the partial look, never the
+ * error one.
+ */
+const noObservationChip = (signal: Signal): string => {
+  if (signal.velocity !== undefined || signal.total !== undefined) return "";
+  if (!signal.noObservation) {
+    return `<span class="score no-observation"><span class="state partial">${esc(S.strings.noObservationFallback)}</span></span>`;
+  }
+  return `<span class="score no-observation"><span class="state partial">${esc(S.strings.noObservation)}</span> ${esc(noObservationReasonLabel(signal.noObservation.reason))}</span>`;
+};
+
+/** The honest detail line under a no-observation signal's note (payload text verbatim). */
+const noObservationDetail = (signal: Signal): string =>
+  signal.noObservation?.detail ? `<div class="sub">${esc(signal.noObservation.detail)}</div>` : "";
+
+/**
+ * AT-P5.4 (handoff §11): compact point-of-use coverage disclosure. The
+ * signals card and the opportunities list draw on source records to rank or
+ * signal, so the window + limit marker of every source feeding them shows
+ * inline, taken from the coverage slices the report already carries — the
+ * standalone coverage card above stays the full view. The keyless organic
+ * feed's rolling window (~15 recent uploads, no complete historical archive)
+ * stays visible wherever organic records feed ranked output. Sources are the
+ * records that actually feed the ranked output (ads, organic, metrics from
+ * the evidence view); without evidence the coverage slices' own sources
+ * stand in. Removing or obscuring this disclosure is a regression, not a
+ * cleanup.
+ */
+const pointOfUseCoverage = (): string => {
+  const slices = S.report?.coverage?.slices ?? [];
+  const feedingSources = S.evidence
+    ? [...new Set([...S.evidence.ads, ...S.evidence.organic, ...S.evidence.metrics].map((r) => r.source.sourceId))]
+    : [...new Set(slices.map((s) => s.sourceId))];
+  if (feedingSources.length === 0) return "";
+  const marker = (sourceId: string): string => {
+    const own = slices.filter((s) => s.sourceId === sourceId);
+    const windows = [...new Set(own.flatMap((s) => (s.dateWindow ? [s.dateWindow] : [])))];
+    if (windows.length > 0) return windows.join(" · ");
+    return own.length > 0 ? own[0].state : S.strings.coverageInlineNoWindow;
+  };
+  const entries = feedingSources.map((id) => `<span class="mono">${esc(id)}</span> — ${esc(marker(id))}`);
+  return `<div class="hint point-of-use-coverage"><b>${esc(S.strings.coverageInline)}</b> ${entries.join("; ")}</div>`;
+};
+
 function renderReport(entry: MissionEntry): string {
   const brief = selectedBrief() ?? entry.brief;
   const competitors = S.report?.competitors ?? entry.competitors;
@@ -185,7 +246,7 @@ function renderReport(entry: MissionEntry): string {
           (s) => `
         <div class="row">
           <span class="state ${STATE_CLASS[s.state] ?? "partial"}">${esc(s.state)}</span>
-          <div class="grow"><b>${esc(s.slice)}</b><div class="sub">${esc(s.note)}</div></div>
+          <div class="grow"><b>${esc(s.slice)}</b><div class="sub">${s.dateWindow ? `${esc(s.dateWindow)} · ` : ""}${esc(s.note)}</div></div>
           <span class="mono">${esc(s.sourceId)} v${esc(s.connectorVersion)}</span>
         </div>`,
         )
@@ -199,14 +260,16 @@ function renderReport(entry: MissionEntry): string {
   sections.push(`
     <div class="card"><h2>${esc(S.strings.signals)}</h2>
       ${!S.report || S.report.signals.length === 0 ? `<div class="empty">${esc(S.strings.signalsEmpty)}</div>` : `
+      ${pointOfUseCoverage()}
       <div class="rows">${S.report.signals
         .map(
           (s) => `
         <div class="row">
           <span class="mono">${esc(s.subjectRef)}</span>
-          <div class="grow"><div class="sub">${esc(s.note)}</div></div>
+          <div class="grow"><div class="sub">${esc(s.note)}</div>${noObservationDetail(s)}</div>
           ${s.total !== undefined ? `<span class="score">${esc(s.note.includes("[PROXY]") ? "proxy total" : "total")} <b>${num(s.total, 0)}</b></span>` : ""}
           ${s.velocity !== undefined ? `<span class="score">velocity/7d <b>${num(s.velocity)}</b></span>` : ""}
+          ${noObservationChip(s)}
         </div>`,
         )
         .join("")}</div>`}
@@ -237,7 +300,7 @@ function renderReport(entry: MissionEntry): string {
     .join("");
   sections.push(`
     <div class="card"><h2>${esc(S.strings.opportunities)} <span class="count">${opportunities.length}</span></h2>
-      ${opportunities.length === 0 ? `<div class="empty">${esc(S.strings.opportunitiesEmpty)}</div>` : opportunityCards}
+      ${opportunities.length === 0 ? `<div class="empty">${esc(S.strings.opportunitiesEmpty)}</div>` : `${pointOfUseCoverage()}${opportunityCards}`}
     </div>`);
 
   if (nextStep) {

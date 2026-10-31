@@ -83,9 +83,12 @@ export interface CreativeState {
 
 export interface CoverageSlice {
   slice: string;
-  state: "ok" | "partial" | "gap";
+  /** Canonical coverage states from @zcode/marketing — a gap is a normal state, never an error. */
+  state: "available" | "partial" | "unavailable" | "not_connected" | "restricted";
   sourceId: string;
   connectorVersion: string;
+  /** What the source itself reports as its window/limit, e.g. "last 15 uploads". */
+  dateWindow?: string;
   note: string;
 }
 
@@ -94,10 +97,21 @@ export interface Coverage {
   supportsConclusion: string;
 }
 
+/**
+ * WO-P5 §2 pinned integration contract: velocity/total are absent exactly
+ * when no observation supports them — noObservation states WHY so the panel
+ * renders an explicit no-observation chip, never a blank row or a zero.
+ */
+export interface NoObservation {
+  reason: "before_coverage" | "insufficient_window" | "not_observed";
+  detail: string;
+}
+
 export interface Signal {
   subjectRef: string;
   velocity?: number;
   total?: number;
+  noObservation?: NoObservation;
   note: string;
 }
 
@@ -286,8 +300,16 @@ export const en = {
   coverage: "Data coverage",
   coverageEmpty: "No research run recorded yet.",
   conclusion: "Conclusion",
+  coverageInline:
+    "Source coverage at point of use (rolling windows hold recent records only — not a complete history):",
+  coverageInlineNoWindow: "no window recorded",
   signals: "Performance signals",
   signalsEmpty: "No performance signals yet.",
+  noObservation: "no observation",
+  noObservationFallback: "no observation recorded",
+  reasonBeforeCoverage: "before coverage",
+  reasonInsufficientWindow: "insufficient window",
+  reasonNotObserved: "not observed",
   opportunities: "Creative opportunities",
   opportunitiesEmpty:
     "No ranked opportunities — the paid×organic intersection needs ad evidence; check coverage above.",
@@ -357,8 +379,15 @@ export const zh: Strings = {
   coverage: "数据覆盖",
   coverageEmpty: "尚未记录调研结果。",
   conclusion: "结论",
+  coverageInline: "使用点的来源覆盖（滚动窗口仅含近期记录 — 并非完整历史）：",
+  coverageInlineNoWindow: "未记录覆盖窗口",
   signals: "表现信号",
   signalsEmpty: "暂无表现信号。",
+  noObservation: "无观测",
+  noObservationFallback: "无观测记录",
+  reasonBeforeCoverage: "早于覆盖起点",
+  reasonInsufficientWindow: "窗口不足",
+  reasonNotObserved: "未观测到",
   opportunities: "创意机会",
   opportunitiesEmpty: "暂无排序机会 — 付费×自然交叉需要广告证据；见上方覆盖报告。",
   evidence: "证据",

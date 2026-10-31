@@ -64,6 +64,16 @@ const performanceSignalShape = {
   subjectRef: z.string(),
   velocity: z.number().optional(),
   total: z.number().optional(),
+  // WO-P5 §2 pinned contract: velocity/total stay absent exactly when no
+  // observation supports them — noObservation states WHY, so the panel can
+  // render an explicit no-observation chip instead of a blank row (AT-P5.2).
+  // Optional on purpose: older workflow output without it stays valid.
+  noObservation: z
+    .object({
+      reason: z.enum(['before_coverage', 'insufficient_window', 'not_observed']),
+      detail: z.string(),
+    })
+    .optional(),
   note: z.string(),
 };
 
@@ -392,6 +402,11 @@ export function createMarketingServer(
         ...mission.store.allAds().map((a) => a.id),
         ...mission.store.allOrganic().map((o) => o.id),
       ]);
+      // WO-P5 §2 consumer side: read the optional noObservation contract field
+      // through the report shape so absence is stated in the text report and
+      // flows to the panel — without depending on the workflow-side change
+      // having landed (the field is optional, the assignment is structural).
+      const reportSignals: z.infer<z.ZodObject<typeof performanceSignalShape>>[] = signals;
       let opportunities: OpportunityScore[] = [];
       let opportunityNote =
         'No ranked opportunities: no ad evidence was ingested — check the research coverage report for per-competitor ad-source resolution outcomes, or run demo mode to see the loop with labeled synthetic fixtures.';
@@ -455,7 +470,12 @@ export function createMarketingServer(
       }
       sections.push(
         '## Performance signals (objective-appropriate, like-for-like)',
-        ...signals.map((s) => `- ${s.subjectRef}: ${s.note}${s.total !== undefined ? ` (latest ${s.total})` : ''}`),
+        ...reportSignals.map(
+          (s) =>
+            `- ${s.subjectRef}: ${s.note}${s.total !== undefined ? ` (latest ${s.total})` : ''}${
+              s.noObservation ? ` (no observation — ${s.noObservation.reason}: ${s.noObservation.detail})` : ''
+            }`,
+        ),
       );
       sections.push('## Creative opportunities');
       if (opportunities.length > 0) {
@@ -486,7 +506,7 @@ export function createMarketingServer(
           brief: entry.brief,
           competitors,
           ...(coverage ? { coverage } : {}),
-          signals,
+          signals: reportSignals,
           opportunities,
         },
       };
