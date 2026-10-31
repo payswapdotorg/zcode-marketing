@@ -160,6 +160,9 @@ export class YoutubePublicConnector implements MarketingConnector {
           if (!Number.isNaN(entry.views)) {
             // Current-snapshot public stat, observed now — observed_at is the
             // observation time, published_at is the content's own time.
+            // WO-P5 (AT-P5.3): a value we read ourselves at fetch time is a
+            // first-party observation; the feed states no reported-at of its
+            // own for the running total.
             metrics.push({
               kind: 'MetricObservation',
               id: `ytobs:${entry.videoId}:views:${retrievedAt}`,
@@ -168,6 +171,7 @@ export class YoutubePublicConnector implements MarketingConnector {
               metricKey: 'views',
               value: entry.views,
               observedAt: retrievedAt,
+              recordType: 'first_party_observation',
               source: {
                 sourceId: 'youtube-public-rss',
                 sourceRecordId: entry.videoId,

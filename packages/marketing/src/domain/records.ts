@@ -149,6 +149,28 @@ export const organicContent = z.object({
 export type OrganicContent = z.infer<typeof organicContent>;
 
 /**
+ * WO-P5 (AT-P5.3): what kind of record a metric observation is.
+ *  - first_party_observation: a value the system itself observed at
+ *    observedAt (e.g. a public stat read at fetch time);
+ *  - source_reported: a value the platform reports for a stated time of its
+ *    own (reportedAt, e.g. a daily analytics row) — observedAt stays when WE
+ *    recorded it;
+ *  - estimate: a derived/projected number, never merged into observed history
+ *    unprompted (SimulationRun keeps counterfactuals separate).
+ *
+ * The entity records already keep this separation structurally — AdCreative
+ * separates our firstObservedAt/lastObservedAt from platform-REPORTED delivery
+ * metadata in availableMetadata, OrganicContent carries the platform's own
+ * publishedAt — MetricObservation was the gap this type closes.
+ */
+export const metricRecordType = z.enum([
+  'first_party_observation',
+  'source_reported',
+  'estimate',
+]);
+export type MetricRecordType = z.infer<typeof metricRecordType>;
+
+/**
  * A metric value at an observation time. Semantics + version travel with the
  * value because platform definitions change (MARKETING-DATA-MODEL.md).
  */
@@ -162,6 +184,20 @@ export const metricObservation = z.object({
   value: z.number().nonnegative(),
   /** observedAt != publishedAt != ingestedAt — never conflate them. */
   observedAt: isoDateTime,
+  /**
+   * WO-P5 (AT-P5.3): when the platform says the value was current — may
+   * legitimately differ from observedAt (a source-reported daily stat is
+   * recorded later than the period it describes). Absent when the source
+   * states no time of its own (e.g. a running total read at fetch time) and
+   * on records recorded before this field existed.
+   */
+  reportedAt: isoDateTime.optional(),
+  /**
+   * WO-P5 (AT-P5.3): what kind of record this is (see metricRecordType).
+   * Defaults so records recorded before this field parse unchanged
+   * (additive-with-default discipline, W1-3(b) availableMetadata precedent).
+   */
+  recordType: metricRecordType.default('first_party_observation'),
   source: sourceIdentity,
   metricDefinition: z.string().min(1),
   metricDefinitionVersion: z.string().min(1),

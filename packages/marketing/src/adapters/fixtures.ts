@@ -50,6 +50,9 @@ const mk = {
       metricKey,
       value,
       observedAt: new Date(Date.now() - (values.length - i) * daysStep * 86_400_000).toISOString(),
+      // WO-P5 (AT-P5.3): fixture models a current-snapshot public stat read at
+      // observedAt — a first-party observation (synthetic, labeled as such).
+      recordType: 'first_party_observation' as const,
       source: { sourceId: subjectRef.startsWith('ad-') ? 'sample-adlib' : 'sample-platform', sourceRecordId: subjectRef, connectorVersion: '0.1.0' },
       metricDefinition: 'platform-public-stat',
       metricDefinitionVersion: 'v1',

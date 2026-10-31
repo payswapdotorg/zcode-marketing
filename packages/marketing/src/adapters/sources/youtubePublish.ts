@@ -328,6 +328,12 @@ export class YoutubePublishConnector implements MarketingConnector {
             metricKey: metric,
             value,
             observedAt: `${day}T00:00:00.000Z`,
+            // WO-P5 (AT-P5.3): the Analytics API REPORTS a daily value for the
+            // day it attributes it to — a source-reported record; reportedAt is
+            // that platform-stated day (observedAt stays keyed to the same day
+            // bucket, the series' existing dedupe/velocity semantics).
+            reportedAt: `${day}T00:00:00.000Z`,
+            recordType: 'source_reported',
             source: {
               sourceId: `connected-account:${this.connection.connectionId}`,
               sourceRecordId: externalId,

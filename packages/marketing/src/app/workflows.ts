@@ -25,6 +25,7 @@ import type {
   CompetitorCandidate,
   CreativeFeatureSet,
   EvidenceRef,
+  MetricObservation,
   OrganicContent,
   ProductBrief,
 } from '../domain/records.js';
@@ -77,6 +78,18 @@ export interface OpportunityScore {
   predicted: number;
   confidence: number;
   explanation: string;
+}
+
+/**
+ * WO-P5 §2 pinned integration contract (frozen — name, reason enum and
+ * optionality; any change is a TL decision recorded in the plan first): why a
+ * performance signal carries no values. Present exactly when `velocity` and
+ * `total` are both undefined; a signal with a value never carries it.
+ */
+export interface SignalNoObservation {
+  reason: 'before_coverage' | 'insufficient_window' | 'not_observed';
+  /** Honest, self-contained statement of the series' actual state. */
+  detail: string;
 }
 
 export class MarketingMission {
@@ -211,7 +224,14 @@ export class MarketingMission {
    * Missing objective metrics fall back to labeled proxy signals, never to
    * invented conversions.
    */
-  performanceSignals(subjectRefs: string[]): Array<{ subjectRef: string; velocity?: number; total?: number; note: string }> {
+  performanceSignals(subjectRefs: string[]): Array<{
+    subjectRef: string;
+    velocity?: number;
+    total?: number;
+    note: string;
+    /** WO-P5 §2 contract: present exactly when velocity and total are both undefined. */
+    noObservation?: SignalNoObservation;
+  }> {
     const at = this.now();
     const primary = PRIMARY_METRIC[this.brief.objective];
     return subjectRefs.map((subjectRef) => {
@@ -221,6 +241,7 @@ export class MarketingMission {
         return {
           subjectRef,
           note: `no observable metric for objective '${this.brief.objective}' — signal unavailable, not invented`,
+          noObservation: this.noObservationFor(subjectRef, primary, at),
         };
       }
       const isProxy = metricKey !== primary;
@@ -237,6 +258,40 @@ export class MarketingMission {
             : `velocity over comparable 7-day window on ${metricKey}`),
       };
     });
+  }
+
+  /**
+   * WO-P5 (AT-P5.2): compose the no-observation reason honestly from the
+   * candidate series' actual state — never interpolated, never invented.
+   * Precedence: no candidate metric ever observed for the subject →
+   * not_observed; the as-of time precedes the subject's first observation →
+   * before_coverage; coverage has started but the as-of series is too thin to
+   * support the signal → insufficient_window (defensive: the ladder walk in
+   * performanceSignals selects a metric whenever an as-of observation exists,
+   * so this fires only if that selection and this derivation ever disagree).
+   */
+  private noObservationFor(subjectRef: string, primary: string, at: string): SignalNoObservation {
+    const candidates = [primary, ...(PROXY_LADDER[primary] ?? [])];
+    const earliest = candidates
+      .map((k) => this.store.firstObservation(k, subjectRef))
+      .filter((o): o is MetricObservation => o !== undefined)
+      .sort((a, b) => a.observedAt.localeCompare(b.observedAt))[0];
+    if (!earliest) {
+      return {
+        reason: 'not_observed',
+        detail: `no observation of ${candidates.join(', ')} has ever been recorded for ${subjectRef}`,
+      };
+    }
+    if (at < earliest.observedAt) {
+      return {
+        reason: 'before_coverage',
+        detail: `first observation of this entity is ${earliest.observedAt} — the window begins after it`,
+      };
+    }
+    return {
+      reason: 'insufficient_window',
+      detail: `observations exist from ${earliest.observedAt} onward but the series as of ${at} has fewer than two snapshots — not enough to support a comparable signal window`,
+    };
   }
 
   /**

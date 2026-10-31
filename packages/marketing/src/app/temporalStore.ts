@@ -17,16 +17,36 @@ import type {
   AdCreative,
   CoverageReport,
   MetricObservation,
+  MetricRecordType,
   OrganicContent,
   SourceIdentity,
 } from '../domain/records.js';
 
 const sourceKey = (s: SourceIdentity): string => `${s.sourceId}/${s.sourceRecordId}`;
 
+/**
+ * WO-P5 (AT-P5.3): as-of queries can filter the series by record type.
+ * Absent options return every record — existing callers unchanged.
+ */
+export interface AsOfQueryOptions {
+  /** Restrict the series to these record types (see metricRecordType). */
+  recordTypes?: MetricRecordType[];
+}
+
+/** Ingest audit outcome — the append-only record of what ingestion did. */
+export type IngestAuditOutcome = 'new' | 'duplicate' | 'superseded' | 'rejected_before_floor';
+
 export interface IngestResult {
   acceptedEntities: number;
   acceptedMetrics: number;
   duplicatesIgnored: number;
+  /**
+   * WO-P5 (AT-P5.5): observations rejected by the anti-fabrication floor —
+   * their observedAt precedes the earliest observation ever ingested for the
+   * (metricKey, subjectRef) series. Rejections are also audited per record
+   * ('rejected_before_floor'); never silently accepted, never inserted.
+   */
+  rejectedBeforeFloor?: number;
 }
 
 /**
@@ -39,8 +59,15 @@ export interface TemporalStorePort {
   ingestMetrics(observations: MetricObservation[], now: string): IngestResult;
   recordCoverage(report: CoverageReport): void;
   /** As-of query: only observations actually available at `at` are returned. */
-  metricsAsOf(metricKey: string, subjectRef: string, at: string): MetricObservation[];
-  latestObservation(metricKey: string, subjectRef: string, at: string): MetricObservation | undefined;
+  metricsAsOf(metricKey: string, subjectRef: string, at: string, options?: AsOfQueryOptions): MetricObservation[];
+  latestObservation(metricKey: string, subjectRef: string, at: string, options?: AsOfQueryOptions): MetricObservation | undefined;
+  /**
+   * WO-P5 (AT-P5.2): the series' first observation ever ingested (as-of
+   * agnostic). Lets callers distinguish a pre-coverage as-of query (series
+   * exists but starts after `at`) from a never-observed subject (no series)
+   * instead of seeing both as an empty list.
+   */
+  firstObservation(metricKey: string, subjectRef: string): MetricObservation | undefined;
   /** Velocity over a comparable window (like-for-like discipline). */
   velocity(metricKey: string, subjectRef: string, at: string, windowDays: number): number | undefined;
   allAds(): AdCreative[];
@@ -48,7 +75,7 @@ export interface TemporalStorePort {
   /** Full observation read model for evidence/provenance viewers (W3-1 contract addition). */
   allMetrics(): MetricObservation[];
   latestCoverage(): CoverageReport | undefined;
-  ingestAudit(): ReadonlyArray<{ at: string; key: string; outcome: 'new' | 'duplicate' | 'superseded' }>;
+  ingestAudit(): ReadonlyArray<{ at: string; key: string; outcome: IngestAuditOutcome }>;
 }
 
 export class TemporalStore implements TemporalStorePort {
@@ -60,7 +87,7 @@ export class TemporalStore implements TemporalStorePort {
   private readonly ingestLog: Array<{
     at: string;
     key: string;
-    outcome: 'new' | 'duplicate' | 'superseded';
+    outcome: IngestAuditOutcome;
   }> = [];
 
   /** Idempotent ingest: same source identity + same observation window is a no-op. */
@@ -75,8 +102,41 @@ export class TemporalStore implements TemporalStorePort {
   ingestMetrics(observations: MetricObservation[], now: string): IngestResult {
     let accepted = 0;
     let dupes = 0;
+    let rejected = 0;
+    // WO-P5 (AT-P5.5) anti-fabrication floor, per (metricKey, subjectRef)
+    // series: the earliest observedAt ever ingested. Computed for the whole
+    // batch before any record is processed, because the batch that introduces
+    // a series sets its floor to the BATCH minimum (an unordered introducing
+    // batch must not reject its own earlier records). For an existing series
+    // the floor is the head of the ascending series — records are never
+    // removed and observedAt never mutates, so that head IS the earliest
+    // observation ever ingested.
+    const floorFor = new Map<string, string>();
+    for (const obs of observations) {
+      const seriesKey = `${obs.metricKey} ${obs.subjectRef}`;
+      if (floorFor.has(seriesKey)) continue;
+      const series = this.metrics.get(obs.metricKey)?.get(obs.subjectRef);
+      floorFor.set(
+        seriesKey,
+        series
+          ? series[0]!.observedAt
+          : observations
+              .filter((o) => o.metricKey === obs.metricKey && o.subjectRef === obs.subjectRef)
+              .reduce((min, o) => (o.observedAt < min ? o.observedAt : min), obs.observedAt),
+      );
+    }
     for (const obs of observations) {
       const key = `${obs.source.sourceId}/${obs.source.sourceRecordId}#${obs.metricKey}@${obs.observedAt}`;
+      // The system did not observe before it started observing: a record
+      // claiming an earlier observedAt than the series floor is fabrication.
+      // Checked BEFORE the duplicate paths so a repeated violation attempt is
+      // rejected again, never miscounted as an ordinary duplicate.
+      const floor = floorFor.get(`${obs.metricKey} ${obs.subjectRef}`);
+      if (floor !== undefined && obs.observedAt < floor) {
+        this.ingestLog.push({ at: now, key, outcome: 'rejected_before_floor' });
+        rejected += 1;
+        continue;
+      }
       const log = this.ingestLog.find((e) => e.key === key);
       if (log) {
         dupes += 1;
@@ -104,7 +164,7 @@ export class TemporalStore implements TemporalStorePort {
       this.ingestLog.push({ at: now, key, outcome: 'new' });
       accepted += 1;
     }
-    return { acceptedEntities: 0, acceptedMetrics: accepted, duplicatesIgnored: dupes };
+    return { acceptedEntities: 0, acceptedMetrics: accepted, duplicatesIgnored: dupes, rejectedBeforeFloor: rejected };
   }
 
   recordCoverage(report: CoverageReport): void {
@@ -113,15 +173,26 @@ export class TemporalStore implements TemporalStorePort {
   }
 
   /** As-of query: only observations actually available at `at` are returned. */
-  metricsAsOf(metricKey: string, subjectRef: string, at: string): MetricObservation[] {
+  metricsAsOf(metricKey: string, subjectRef: string, at: string, options?: AsOfQueryOptions): MetricObservation[] {
     const series = this.metrics.get(metricKey)?.get(subjectRef);
     if (!series) return [];
-    return series.filter((m) => m.observedAt <= at);
+    const types = options?.recordTypes;
+    return series.filter(
+      (m) =>
+        m.observedAt <= at &&
+        // `??` applies the schema default to hand-built records that bypassed
+        // zod (parsed records always carry the defaulted field).
+        (!types || types.includes(m.recordType ?? 'first_party_observation')),
+    );
   }
 
-  latestObservation(metricKey: string, subjectRef: string, at: string): MetricObservation | undefined {
-    const series = this.metricsAsOf(metricKey, subjectRef, at);
+  latestObservation(metricKey: string, subjectRef: string, at: string, options?: AsOfQueryOptions): MetricObservation | undefined {
+    const series = this.metricsAsOf(metricKey, subjectRef, at, options);
     return series.at(-1);
+  }
+
+  firstObservation(metricKey: string, subjectRef: string): MetricObservation | undefined {
+    return this.metrics.get(metricKey)?.get(subjectRef)?.[0];
   }
 
   /**
@@ -162,7 +233,7 @@ export class TemporalStore implements TemporalStorePort {
     return this.coverageReports.at(-1);
   }
 
-  ingestAudit(): ReadonlyArray<{ at: string; key: string; outcome: 'new' | 'duplicate' | 'superseded' }> {
+  ingestAudit(): ReadonlyArray<{ at: string; key: string; outcome: IngestAuditOutcome }> {
     return this.ingestLog;
   }
 

@@ -17,8 +17,11 @@
  *    the active row is replaced AND the old value is preserved in the
  *    append-only `marketing_metric_revision` table (history is never silently
  *    rewritten);
+ *  - WO-P5 (AT-P5.5): a record whose observed_at precedes the series floor
+ *    (the earliest observed_at ever ingested for that metricKey + subjectRef)
+ *    is rejected loudly and audited, never inserted;
  *  - as-of queries filter the active series by observed_at (exactly like the
- *    in-memory implementation);
+ *    in-memory implementation), optionally by record type (AT-P5.3);
  *  - velocity is computed from the same as-of series.
  *
  * Layer: adapters (the only place file I/O lives, per the CLI's external-I/O
@@ -36,7 +39,7 @@ import {
   metricObservation,
   organicContent,
 } from '../domain/records.js';
-import type { IngestResult, TemporalStorePort } from '../app/temporalStore.js';
+import type { IngestAuditOutcome, IngestResult, AsOfQueryOptions, TemporalStorePort } from '../app/temporalStore.js';
 
 /** Immutable versioned migration — mirrors the shared runner's shape. */
 interface MarketingMigration {
@@ -133,10 +136,46 @@ export class SqliteTemporalStore implements TemporalStorePort {
   ingestMetrics(observations: MetricObservation[], now: string): IngestResult {
     let accepted = 0;
     let dupes = 0;
+    let rejected = 0;
     this.db.exec('begin');
     try {
+      // WO-P5 (AT-P5.5) anti-fabrication floor, per (metricKey, subjectRef)
+      // series: the earliest observed_at ever ingested (same rule as the
+      // in-memory store). Computed for the whole batch before any record is
+      // processed: the batch that introduces a series sets its floor to the
+      // BATCH minimum; for an existing series the floor is the active table's
+      // MIN(observed_at) — rows are never deleted and observed_at never
+      // mutates, so that minimum IS the earliest ever ingested.
+      const floorStmt = this.db.prepare(
+        'SELECT MIN(observed_at) AS floor FROM marketing_metric_observation WHERE metric_key = ? AND subject_ref = ?',
+      );
+      const floorFor = new Map<string, string>();
+      for (const obs of observations) {
+        const seriesKey = `${obs.metricKey} ${obs.subjectRef}`;
+        if (floorFor.has(seriesKey)) continue;
+        const row = floorStmt.get(obs.metricKey, obs.subjectRef) as { floor: string | null } | undefined;
+        const existing = row?.floor ?? null;
+        floorFor.set(
+          seriesKey,
+          existing !== null
+            ? existing
+            : observations
+                .filter((o) => o.metricKey === obs.metricKey && o.subjectRef === obs.subjectRef)
+                .reduce((min, o) => (o.observedAt < min ? o.observedAt : min), obs.observedAt),
+        );
+      }
       for (const obs of observations) {
         const key = `${obs.source.sourceId}/${obs.source.sourceRecordId}#${obs.metricKey}@${obs.observedAt}`;
+        // The system did not observe before it started observing: a record
+        // claiming an earlier observedAt than the series floor is fabrication.
+        // Checked BEFORE the duplicate/supersede paths so a repeated violation
+        // attempt is rejected again, never miscounted as an ordinary duplicate.
+        const floor = floorFor.get(`${obs.metricKey} ${obs.subjectRef}`);
+        if (floor !== undefined && obs.observedAt < floor) {
+          this.audit(now, key, 'rejected_before_floor');
+          rejected += 1;
+          continue;
+        }
         const existing = this.db
           .prepare(
             'SELECT record_json FROM marketing_metric_observation WHERE source_id = ? AND source_record_id = ? AND metric_key = ? AND observed_at = ?',
@@ -180,7 +219,7 @@ export class SqliteTemporalStore implements TemporalStorePort {
       this.db.exec('rollback');
       throw err;
     }
-    return { acceptedEntities: 0, acceptedMetrics: accepted, duplicatesIgnored: dupes };
+    return { acceptedEntities: 0, acceptedMetrics: accepted, duplicatesIgnored: dupes, rejectedBeforeFloor: rejected };
   }
 
   recordCoverage(report: CoverageReport): void {
@@ -189,17 +228,32 @@ export class SqliteTemporalStore implements TemporalStorePort {
       .run(report.id, report.generatedAt, JSON.stringify(report));
   }
 
-  metricsAsOf(metricKey: string, subjectRef: string, at: string): MetricObservation[] {
+  metricsAsOf(metricKey: string, subjectRef: string, at: string, options?: AsOfQueryOptions): MetricObservation[] {
     const rows = this.db
       .prepare(
         'SELECT record_json FROM marketing_metric_observation WHERE metric_key = ? AND subject_ref = ? AND observed_at <= ? ORDER BY observed_at',
       )
       .all(metricKey, subjectRef, at) as Array<{ record_json: string }>;
-    return rows.map((r) => JSON.parse(r.record_json) as MetricObservation);
+    // Parsed through the schema (like allMetrics) so records persisted before
+    // WO-P5 come back with the defaulted recordType applied.
+    const series = rows.map((r) => metricObservation.parse(JSON.parse(r.record_json)));
+    const types = options?.recordTypes;
+    if (!types) return series;
+    // `??` applies the schema default to hand-built records that bypassed zod.
+    return series.filter((m) => types.includes(m.recordType ?? 'first_party_observation'));
   }
 
-  latestObservation(metricKey: string, subjectRef: string, at: string): MetricObservation | undefined {
-    return this.metricsAsOf(metricKey, subjectRef, at).at(-1);
+  latestObservation(metricKey: string, subjectRef: string, at: string, options?: AsOfQueryOptions): MetricObservation | undefined {
+    return this.metricsAsOf(metricKey, subjectRef, at, options).at(-1);
+  }
+
+  firstObservation(metricKey: string, subjectRef: string): MetricObservation | undefined {
+    const row = this.db
+      .prepare(
+        'SELECT record_json FROM marketing_metric_observation WHERE metric_key = ? AND subject_ref = ? ORDER BY observed_at LIMIT 1',
+      )
+      .get(metricKey, subjectRef) as { record_json: string } | undefined;
+    return row ? metricObservation.parse(JSON.parse(row.record_json)) : undefined;
   }
 
   velocity(metricKey: string, subjectRef: string, at: string, windowDays: number): number | undefined {
@@ -235,11 +289,11 @@ export class SqliteTemporalStore implements TemporalStorePort {
     return row ? (coverageReport.parse(JSON.parse(row.record_json)) as CoverageReport) : undefined;
   }
 
-  ingestAudit(): ReadonlyArray<{ at: string; key: string; outcome: 'new' | 'duplicate' | 'superseded' }> {
+  ingestAudit(): ReadonlyArray<{ at: string; key: string; outcome: IngestAuditOutcome }> {
     const rows = this.db
       .prepare('SELECT at, key, outcome FROM marketing_ingest_audit ORDER BY seq')
       .all() as Array<{ at: string; key: string; outcome: string }>;
-    return rows.map((r) => ({ at: r.at, key: r.key, outcome: r.outcome as 'new' | 'duplicate' | 'superseded' }));
+    return rows.map((r) => ({ at: r.at, key: r.key, outcome: r.outcome as IngestAuditOutcome }));
   }
 
   /** Append-only supersede history (explicit revisions, never silent rewrites). */
@@ -302,7 +356,7 @@ export class SqliteTemporalStore implements TemporalStorePort {
     return { acceptedEntities: accepted, acceptedMetrics: 0, duplicatesIgnored: dupes };
   }
 
-  private audit(at: string, key: string, outcome: 'new' | 'duplicate' | 'superseded'): void {
+  private audit(at: string, key: string, outcome: IngestAuditOutcome): void {
     this.db
       .prepare('INSERT INTO marketing_ingest_audit (at, key, outcome) VALUES (?, ?, ?)')
       .run(at, key, outcome);
