@@ -24,6 +24,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/mos-e2e-formal.yml
+      - scripts/test-desktop-e2e-container.sh
       - packages/desktop/test/e2e/ui-shell/mos-product-flavor.test.ts
   workflow_dispatch:
 

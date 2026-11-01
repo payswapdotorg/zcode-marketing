@@ -12,6 +12,10 @@ DEFAULT_E2E_SPEC="./test/e2e/container-boot.test.ts,./test/e2e/smoke.test.ts,./t
 CONVERSATION_SESSION_VERIFIED_E2E_SPEC=""
 # 只有通过人工 review、formal promotion 和单 spec Docker admission 的插件用例才能写入。
 PLUGIN_MANAGEMENT_VERIFIED_E2E_SPEC=""
+# MOS 产品化 spec的 Docker admission（2026-11-01）：mos-e2e-formal.yml 的正式单 spec 运行
+# 绿色（run 41363702225，commit 6a91ef97，replay-isolated，ZCODE_MOS_IDENTITY=1 构建）。
+# 证据：docs/marketing/evidence/2026-11-01-mos-e2e-formal-run.md。
+MOS_VERIFIED_E2E_SPEC="./test/e2e/ui-shell/mos-product-flavor.test.ts"
 E2E_SPEC_PRESET="${E2E_SPEC_PRESET:-}"
 if [ "$#" -gt 1 ]; then
   printf '[desktop-e2e-container] expected at most one preset argument\n' >&2
@@ -43,9 +47,25 @@ case "$E2E_SPEC_PRESET" in
     fi
     PRESET_E2E_SPEC="$PLUGIN_MANAGEMENT_VERIFIED_E2E_SPEC"
     ;;
+  mos)
+    if [ -z "$MOS_VERIFIED_E2E_SPEC" ]; then
+      printf '[desktop-e2e-container] No MOS product-flavor spec has Docker replay-isolated admission evidence; run a formal spec with E2E_SPEC first (see .github/workflows/mos-e2e-formal.yml).\n' >&2
+      exit 2
+    fi
+    PRESET_E2E_SPEC="$MOS_VERIFIED_E2E_SPEC"
+    # MOS spec 断言营销品牌面（徽标/快启/品牌设置），这些只在 marketing 构建里存在；
+    # 身份轴参与 e2e 构建指纹，未显式指定时预设切到 MOS 身份。
+    if [ -z "${ZCODE_MOS_IDENTITY:-}" ]; then
+      export ZCODE_MOS_IDENTITY=1
+    fi
+    if [ "${E2E_SPEC_PRESET}" = "mos" ] && [ "$ZCODE_MOS_IDENTITY" != "1" ]; then
+      printf '[desktop-e2e-container] mos preset requires ZCODE_MOS_IDENTITY=1; the MOS spec asserts brand surfaces absent from default builds.\n' >&2
+      exit 2
+    fi
+    ;;
   *)
     printf '[desktop-e2e-container] unsupported E2E_SPEC_PRESET: %s\n' "$E2E_SPEC_PRESET" >&2
-    printf '[desktop-e2e-container] expected one of: default, conversation-session-verified, plugins-verified\n' >&2
+    printf '[desktop-e2e-container] expected one of: default, conversation-session-verified, plugins-verified, mos\n' >&2
     exit 1
     ;;
 esac
