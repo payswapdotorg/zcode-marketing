@@ -30,10 +30,19 @@ because the identity changes the `__ZCODE_PRODUCT_FLAVOR__` define baked into th
 bundle). Push-triggered runs are unchanged: empty inputs fall back to the exact
 CI preset pinned before.
 
+**Post-script (same day):** the stored push token lacks repository-admin rights,
+and `workflow_dispatch` requires them — the dispatch API returned
+`403 Must have admin rights to Repository`. The operative trigger is therefore a
+dedicated formal-run workflow, `.github/workflows/mos-e2e-formal.yml`: a single
+job pinning `E2E_SPEC=./test/e2e/ui-shell/mos-product-flavor.test.ts` and
+`ZCODE_MOS_IDENTITY=1`, triggered by pushes to main that touch the workflow file
+or the MOS spec itself (its adding push included), plus `workflow_dispatch` for
+users with admin rights. The ci.yml inputs remain available for a future admin
+run. The formal run's URL is the admission evidence for the MOS spec.
+
 ## Follow-up recorded in this same change
 
 - WORK-REGISTRY change log: CI acceptance row for the MOS landing commit.
-- The formal single-spec MOS container run (dispatch with
-  `e2e_spec=./test/e2e/ui-shell/mos-product-flavor.test.ts`, `mos_identity=true`)
-  is the next step; its outcome lands in a dated evidence file and, on green,
-  the spec's admission path.
+- The formal single-spec MOS container run (dedicated workflow, MOS identity
+  build) is the next step; its outcome lands in a dated evidence file and, on
+  green, the spec's admission path.

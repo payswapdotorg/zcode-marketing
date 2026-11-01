@@ -1,0 +1,64 @@
+# MOS e2e — the formal single-spec container run (Docker admission prerequisite)
+#
+# Why this workflow exists (traceable to scripts/test-desktop-e2e-container.sh):
+# the CI desktop-e2e job runs only the formally admitted replay specs. Admitting a
+# new spec requires a green FORMAL single-spec Docker run first ("run a formal spec
+# with E2E_SPEC first, then use e2e:docker:admit after it passes"). The MOS product
+# spec (packages/desktop/test/e2e/ui-shell/mos-product-flavor.test.ts) expects a
+# ZCODE_MOS_IDENTITY=1 build, so the run must set the identity axis the e2e build
+# fingerprints on (ensure-e2e-desktop-build.mjs).
+#
+# Trigger semantics: a FORMAL RUN, not a standing regression gate — it executes when
+# this workflow file or the MOS spec itself changes on main (the adding push
+# included), plus manual workflow_dispatch for users with admin rights. The run URL
+# is the admission evidence. Regression protection for the default flavor stays in
+# CI (ci.yml desktop-e2e job, admitted set).
+#
+# Governance note: recorded in docs/marketing/WORK-REGISTRY.md (MOS-04) and
+# docs/marketing/evidence/2026-11-01-mos-ci-acceptance.md.
+
+name: MOS e2e (formal single-spec container run)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/mos-e2e-formal.yml
+      - packages/desktop/test/e2e/ui-shell/mos-product-flavor.test.ts
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mos-e2e-formal
+  cancel-in-progress: true
+
+env:
+  HUSKY: "0"
+
+jobs:
+  desktop-e2e-mos:
+    name: desktop e2e (MOS flavor, single spec, container, replay-isolated)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      E2E_SPEC: ./test/e2e/ui-shell/mos-product-flavor.test.ts
+      ZCODE_MOS_IDENTITY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the desktop E2E container suite (MOS formal single-spec run)
+        run: bash scripts/test-desktop-e2e-container.sh
+      - name: List E2E artifact tree (diagnosability)
+        if: always()
+        run: find packages/desktop/.e2e-artifacts packages/desktop/errorShots -type f 2>/dev/null | head -50 || true
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mos-e2e-formal-artifacts
+          path: |
+            packages/desktop/.e2e-artifacts/
+            packages/desktop/errorShots/
+          if-no-files-found: warn
+          include-hidden-files: true
