@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  TID_LOGIN_TRIGGER,
   TID_SETTINGS_BACK_BUTTON,
   TID_SETTINGS_PAGE,
   TID_TASK_SETTINGS_BUTTON,
@@ -199,6 +200,10 @@ async function switchToCodingMode() {
     async () => !(await $('[data-slot="dropdown-menu-content"]').isExisting()),
     { timeout: 10000 },
   );
+  // "Interface mode" 是头像（profile）下拉菜单里的子菜单项，必须先点开菜单，
+  // 否则菜单项根本不在 DOM 里（与 general-coding-mode.test.ts 的 switchMode 同法）。
+  await $(`[data-testid="${TID_LOGIN_TRIGGER}"]`).waitForDisplayed({ timeout: 20000 });
+  await $(`[data-testid="${TID_LOGIN_TRIGGER}"]`).click();
   await clickMenuItem("Interface mode");
   await clickMenuItem("Coding mode", '[role="menuitemradio"]');
   await browser.keys("Escape");
@@ -211,6 +216,12 @@ async function switchToCodingMode() {
     async () =>
       (await $(`[data-testid="${TID_TERMINAL_TOGGLE}"]`).isExisting()) === true,
     { timeout: 10000, timeoutMsg: "编程模式下终端开关未出现" },
+  );
+  await browser.waitUntil(
+    async () =>
+      (await $(`[data-testid="${TID_LOGIN_TRIGGER}"]`).getAttribute("aria-expanded")) ===
+      "false",
+    { timeout: 10000, timeoutMsg: "头像菜单没有关闭" },
   );
 }
 
