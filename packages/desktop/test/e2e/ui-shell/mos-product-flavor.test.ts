@@ -246,9 +246,13 @@ async function clickMenuItem(label: string, selector = '[role="menuitem"]') {
 }
 
 async function assertNoSessionStarted() {
-  // 快启预填不创建会话：composer 仍处于草稿态（无 v4 会话行）。
-  const sessionRows = await browser.execute(
-    () => document.querySelectorAll('[data-testid^="v4-session"]').length,
+  // 快启预填不创建会话。注意 draft 态下 [data-testid^="v4-session"] 也有匹配
+  // （pane + sr-only title 常驻渲染），"没有会话"的正确信号是 pane 的
+  // data-session-id 仍为 "draft"（与 helpers/v4-conversation.ts 的判定一致）。
+  const boundSessions = await browser.execute(() =>
+    [...document.querySelectorAll('[data-testid^="v4-session-pane"]')]
+      .map((pane) => pane.getAttribute("data-session-id") ?? "")
+      .filter((sessionId) => sessionId !== "draft"),
   );
-  expect(sessionRows).toBe(0);
+  expect(boundSessions).toHaveLength(0);
 }
