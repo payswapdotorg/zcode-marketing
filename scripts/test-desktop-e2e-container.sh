@@ -184,6 +184,15 @@ if [ -n "${E2E_PROVIDER_API_KEY:-}" ]; then
   docker_run_args+=(-e "E2E_PROVIDER_API_KEY=${E2E_PROVIDER_API_KEY}")
 fi
 
+# 产品身份轴（ZCODE_MOS_IDENTITY / ZCODE_PREVIEW_IDENTITY）在构建期改变编译进 bundle 的
+# __ZCODE_PRODUCT_FLAVOR__ define（ensure-e2e-desktop-build.mjs 指纹轴），不转发会把默认
+# （ZCode）构建错误复用到 MOS/Preview 的 E2E 运行，反之亦然。仅在显式设置时转发。
+for identity_env_name in ZCODE_MOS_IDENTITY ZCODE_PREVIEW_IDENTITY; do
+  if [ -n "${!identity_env_name:-}" ]; then
+    docker_run_args+=(-e "${identity_env_name}=${!identity_env_name}")
+  fi
+done
+
 # 修复：E2E 上游供应商由环境变量配置后，容器只转发了 API key，抓包模式拿不到上游地址与模型必然失败。
 for provider_env_name in E2E_PROVIDER_BASE_URL E2E_PROVIDER_MODEL E2E_PROVIDER_SECONDARY_MODEL \
   E2E_PROVIDER_PRESET E2E_PROVIDER_THOUGHT_LEVEL E2E_PROVIDER_SECONDARY_THOUGHT_LEVEL; do

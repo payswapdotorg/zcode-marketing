@@ -20,6 +20,17 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      e2e_spec:
+        description: "Desktop-e2e spec override (comma-separated, packages/desktop-relative paths). Empty = the CI replay-admitted preset."
+        required: false
+        default: ""
+        type: string
+      mos_identity:
+        description: "Run the desktop-e2e job with ZCODE_MOS_IDENTITY=1 (MOS marketing-flavor build). Use only with an e2e_spec that expects the MOS identity."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -219,7 +230,11 @@ jobs:
       # credentials-free replay-isolated mode this job pins, so it is excluded from the
       # CI preset and recorded as a credentials-gated path (run it manually with a real
       # provider key; evidence in docs/marketing/evidence/2026-10-29-ci-first-run.txt).
-      E2E_SPEC: ./test/e2e/container-boot.test.ts,./test/e2e/smoke.test.ts,./test/e2e/e2ecase-regression.test.ts,./test/e2e/task-list-archive-confirmation.test.ts
+      # workflow_dispatch inputs (empty on push/PR) exist for the formal single-spec
+      # runs the Docker admission protocol requires (run a spec with E2E_SPEC first,
+      # then admit it); mos_identity flips the build to the MOS marketing flavor.
+      E2E_SPEC: ${{ inputs.e2e_spec || './test/e2e/container-boot.test.ts,./test/e2e/smoke.test.ts,./test/e2e/e2ecase-regression.test.ts,./test/e2e/task-list-archive-confirmation.test.ts' }}
+      ZCODE_MOS_IDENTITY: ${{ inputs.mos_identity && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Run the desktop E2E container suite (replay-admitted specs)
