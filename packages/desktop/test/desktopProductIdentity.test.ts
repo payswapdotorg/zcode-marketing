@@ -115,4 +115,64 @@ describe("desktop product identity", () => {
   it("开发态继续使用独立 AUMID，避免污染打包版 Shell 身份", () => {
     expect(resolveWindowsAppUserModelId({}, { isPackaged: false })).toBe("cn.aminer.zcode");
   });
+
+  // ── MOS（marketing flavor）身份（docs/marketing/MOS-INTAKE.md §8 MOS-02 / D-MOS-1 选项 A）──
+
+  it("ZCODE_MOS_IDENTITY=1 在两种后端上都得到 MOS 身份（身份轴与后端轴正交）", () => {
+    expect(
+      resolveDesktopProductIdentity({ ZCODE_ENV: "production", ZCODE_MOS_IDENTITY: "1" }),
+    ).toEqual({
+      flavor: "marketing",
+      appId: "dev.zcode.app.mos",
+      productName: "MOS",
+      linuxExecutableName: "mos",
+      linuxPackageName: "mos",
+      cuaHelperInstallVariant: null,
+    });
+    expect(
+      resolveDesktopProductIdentity({ ZCODE_ENV: "test", ZCODE_MOS_IDENTITY: "1" }).flavor,
+    ).toBe("marketing");
+    // 后端轴仍由 ZCODE_ENV 决定：测试后端的 MOS 产物带 _TEST 后缀，生产后端不带。
+    expect(resolveDesktopArtifactSuffix({ ZCODE_ENV: "test", ZCODE_MOS_IDENTITY: "1" })).toBe(
+      "_TEST",
+    );
+    expect(resolveDesktopArtifactSuffix({ ZCODE_ENV: "production", ZCODE_MOS_IDENTITY: "1" })).toBe(
+      "",
+    );
+  });
+
+  it("默认不注入开关时任何后端都不是 marketing：默认构建行为不变", () => {
+    expect(resolveDesktopProductFlavor({ ZCODE_ENV: "production" })).toBe("production");
+    expect(resolveDesktopProductFlavor({ ZCODE_ENV: "test" })).toBe("preview");
+    expect(resolveDesktopProductFlavor({ ZCODE_MOS_IDENTITY: "0" })).toBe("preview");
+  });
+
+  it("MOS 开关与 Preview 开关同样只认 1/0 拼写", () => {
+    for (const flag of ["true", "yes", "on", "false", "no", "off", "2"]) {
+      expect(() =>
+        resolveDesktopProductFlavor({ ZCODE_ENV: "production", ZCODE_MOS_IDENTITY: flag }),
+      ).toThrow(/expected 1 or 0/);
+    }
+  });
+
+  it("MOS 与 Preview 身份开关互斥：同时开启构建期失败", () => {
+    // 一个安装包只能有一个产品身份；两个显式身份并存是配置错误，不能静默选一个。
+    expect(() =>
+      resolveDesktopProductFlavor({
+        ZCODE_ENV: "production",
+        ZCODE_MOS_IDENTITY: "1",
+        ZCODE_PREVIEW_IDENTITY: "1",
+      }),
+    ).toThrow(/mutually exclusive/);
+  });
+
+  it("marketing flavor 的打包态 AUMID 使用 MOS 自己的 appId", () => {
+    // 否则 Windows 会把 MOS 快捷方式、开始菜单索引和运行进程归到 ZCode 名下。
+    expect(resolveWindowsAppUserModelIdForFlavor("marketing")).toBe(
+      desktopProductIdentities.marketing.appId,
+    );
+    expect(
+      resolveWindowsAppUserModelId({ ZCODE_ENV: "production", ZCODE_MOS_IDENTITY: "1" }),
+    ).toBe("dev.zcode.app.mos");
+  });
 });

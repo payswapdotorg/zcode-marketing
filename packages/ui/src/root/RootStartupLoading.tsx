@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ZCODE_PRODUCT_IDENTITY } from "@zcode/shared";
 import { cn } from "@/components/lib/utils.js";
 
 interface RootStartupLoadingProps {
@@ -18,8 +19,50 @@ export function RootStartupLoading({ label, children, busy = true }: RootStartup
       aria-label={label}
       data-testid="root-startup-loading"
     >
-      <ZCodeStartupLogoBadge />
+      <ProductLogoBadge />
       {children}
+    </div>
+  );
+}
+
+/**
+ * 产品身份徽标（docs/marketing/MOS-INTAKE.md §8 MOS-02）：
+ * - 默认（production/preview）身份：逐字复用 ZCodeStartupLogoBadge，输出与引入前一致；
+ * - marketing 身份（MOS）：渲染原型里的字母标记（"M"），同一徽标外壳与尺寸体系。
+ * 编译期身份常量让默认构建折叠到第一个分支。
+ */
+export function ProductLogoBadge({
+  animated = true,
+  size = "default",
+}: {
+  animated?: boolean;
+  size?: "default" | "titlebar";
+}) {
+  const markGlyph = ZCODE_PRODUCT_IDENTITY.markGlyph;
+  if (markGlyph === null) {
+    return <ZCodeStartupLogoBadge animated={animated} size={size} />;
+  }
+  return (
+    <div
+      data-desktop-logo-badge="true"
+      role="img"
+      aria-label={ZCODE_PRODUCT_IDENTITY.shortName}
+      className={cn(
+        "relative flex items-center justify-center bg-[linear-gradient(180deg,#4f46e5_0%,#7c3aed_100%)] text-white before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-[rgba(255,255,255,0.25)] before:content-['']",
+        size === "titlebar"
+          ? "size-5 rounded shadow-sm/20"
+          : "size-24 rounded-3xl shadow-xl/20",
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "font-semibold leading-none",
+          size === "titlebar" ? "text-[11px]" : "text-[44px]",
+        )}
+      >
+        {markGlyph}
+      </span>
     </div>
   );
 }

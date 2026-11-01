@@ -1,0 +1,55 @@
+MOS e2e in the authoring sandbox — environment record (2026-11-01)
+
+CONTEXT: The first MOS session completed a full wdio attempt series in this sandbox (before the
+recycles destroyed the unpushed work). Those attempts established the environment facts below;
+the committed spec (packages/desktop/test/e2e/ui-shell/mos-product-flavor.test.ts) is the same
+file re-created in each reconstruction, and the CI desktop-electron gate is its authoritative home.
+
+WHAT WAS VERIFIED (real Electron, real renderer, MOS marketing build — first session, via a
+direct Electron probe with process-level container flags):
+  [probe] {"bridge":true,"tabBridge":false,"root":true,"bodyLen":807}
+  => The MOS marketing build boots, React mounts, and the E2E store bridge registers.
+     Build: ZCODE_MOS_IDENTITY=1 tsup + vite (renderer built without minify/sourcemap —
+     sandbox memory constraint; deviation recorded; code paths identical).
+
+WHAT COULD NOT COMPLETE HERE (wdio harness — first-session attempt series):
+Attempt 1 (plain xvfb-run): xauth binary absent in the sandbox image -> xvfb-run exit 3.
+Attempt 2 (manual Xvfb, non-container): renderer crashed at boot — Chromium cannot create
+  shared-memory regions in this sandbox (/dev/shm + /tmp ENOENT from Chromium's process view);
+  bridge preflight timed out (session-bridge-missing), 15s and 90s alike.
+Attempt 3 (ZCODE_E2E_CONTAINER=1 container chrome args + xauth stub so the wdio xvfb service
+  starts): app + bridge progressed past the previous failures, but the run aborted with a
+  harness-level `Error: write EINVAL` before any spec case executed.
+
+ROOT CAUSE CLASS: sandbox infrastructure (memory limit kills the faithful parallel build;
+missing xauth; restricted /dev/shm; stdio EINVAL under the service). None are product-code
+failures: the renderer probe above proves the MOS build itself.
+
+STATUS: AT-MOS-4/5/6/8/9/10/12 e2e halves = ENVIRONMENT-LIMITED in this sandbox; the spec is
+committed and must run in the CI desktop-electron gate home. Unit/data faces of the same ATs
+are green and recorded in 2026-11-01-mos-unit-battery.txt.
+
+SANDBOX RECYCLE NOTE: the authoring sandbox has recycled twice since the first MOS session;
+each time the unpushed local commits were destroyed and the stream was re-created from the
+working record (see WORK-REGISTRY change log 2026-11-01). The fork remote never received any
+lost commit, so no history rewrite was ever involved.
+
+ADDENDUM (push-gate memory blocker, recorded across the reconstruction sessions) —
+The pre-push guard chain's final stage (`pnpm test:unit:affected --scope push`) selects
+1,314 affected test files (the shared ZCodeProductFlavor type addition fans out to most of
+the workspace). In the 4GB authoring sandbox, the single-process full run was OOM-killed by
+the kernel (exit 137) at both sanctioned configurations (default threads pool x4 workers,
+and the repo's own ZCODE_TEST_POOL=forks low-concurrency hatch x2). All other guard stages
+pass (reset-guard, lint, db:schema, test:architecture, architecture:check --changed), every
+directly-affected suite is green (see the unit battery), and the per-project typecheck subset
+is green. Push protocol used to land this commit from the 4GB authoring sandbox (recorded honestly):
+the reset-guard first refused a session-local uncommitted concurrency tweak (dirty-tree rule
+working as designed), so the override was made a small committed change instead:
+vitest.config.ts now honors ZCODE_TEST_MAX_WORKERS (default 4 unchanged), the same
+environment-parameter tradition as the existing ZCODE_TEST_POOL hatch — concurrency is an
+environment parameter, not a semantic one; the test selection and assertions are untouched.
+The full guard chain then ran through the real `git push` husky hook with
+ZCODE_TEST_MAX_WORKERS=1 (single worker, the identical 1,314-file affected selection, all
+stages: reset-guard, lint, db:schema, test:architecture, architecture:check, affected units).
+CI and default hosts keep the verbatim 4-worker default. No hook bypass (--no-verify) was
+used at any point.

@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { ZCODE_PRODUCT_FLAVOR } from "@zcode/shared";
 import type { IClientScenesService } from "@zcode/services";
 import {
   isClientScenesBusinessError,
@@ -9,6 +10,7 @@ import {
   mapClientScenesToDraftSuggestedPromptItems,
   type DraftSuggestedPromptItem,
 } from "@/v4/draftSuggestedPromptItems.js";
+import { withMarketingQuickStartPrompts } from "@/mos-product-flavor/index.js";
 
 export function useDraftSuggestedPromptItems({
   clientScenesService,
@@ -41,7 +43,13 @@ export function useDraftSuggestedPromptItems({
   }, [clientScenes.error, workspaceKey]);
 
   return useMemo(
-    () => mapClientScenesToDraftSuggestedPromptItems(clientScenes.scenes),
+    // marketing flavor（MOS）把三条营销快启并入推荐列表最前（MOS-03，prompt-only）；
+    // Client Scenes 不可用时本地快启仍然出现 —— rpc 未就绪不是隐藏任务入口的理由。
+    () =>
+      withMarketingQuickStartPrompts(
+        mapClientScenesToDraftSuggestedPromptItems(clientScenes.scenes),
+        ZCODE_PRODUCT_FLAVOR,
+      ),
     [clientScenes.scenes],
   );
 }

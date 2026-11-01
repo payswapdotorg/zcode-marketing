@@ -1,6 +1,15 @@
 import { resolve } from "node:path";
 import { configDefaults, defineConfig } from "vitest/config";
 
+/**
+ * 并发上限的环境覆盖（默认 4 不变）：低内存主机（如 4GB 沙箱/CI 容器）全量运行
+ * threads 池会被内核 OOM-kill。与 ZCODE_TEST_POOL 同一传统 —— 并发数是环境参数，
+ * 不是语义参数；测试选择与断言完全不变。例：ZCODE_TEST_MAX_WORKERS=1。
+ */
+const vitestMaxWorkers = process.env.ZCODE_TEST_MAX_WORKERS
+  ? Math.max(1, Math.trunc(Number(process.env.ZCODE_TEST_MAX_WORKERS)))
+  : 4;
+
 const processLifecycleTests = [
   "packages/services/test/processTreeTerminator.test.ts",
   "packages/services/test/zcodeAgentService.test.ts",
@@ -103,7 +112,7 @@ export default defineConfig({
     // Windows 上还会触发 EPERM/ENOTEMPTY。此前只给 Windows 放宽，但 macOS/Linux 低配机同样会因
     // 内存抖动（swap thrashing）拖慢 spawn，故统一降低并发并放宽超时。
     hookTimeout: 30_000,
-    maxWorkers: 4,
+    maxWorkers: vitestMaxWorkers,
     testTimeout: 30_000,
     // 修复原因：900+ 文件全部使用隔离 fork 时，macOS 会在尾部因连续创建进程而随机
     // 启动 worker 超时。普通用例使用 threads；会修改 cwd/umask、回收 POSIX 进程树或
@@ -130,7 +139,7 @@ export default defineConfig({
           exclude: ["packages/desktop/test/e2e/**", "packages/zcode-cua/**", ...forkIsolatedTests],
           // Node 24/macOS 的 threads 全量运行可触发 V8 SIGSEGV；诊断时切换进程隔离，测试范围不变。
           pool: process.env.ZCODE_TEST_POOL === "forks" ? "forks" : "threads",
-          maxWorkers: process.env.ZCODE_TEST_POOL === "forks" ? 2 : 4,
+          maxWorkers: process.env.ZCODE_TEST_POOL === "forks" ? 2 : vitestMaxWorkers,
           sequence: { groupOrder: 0 },
         },
       },

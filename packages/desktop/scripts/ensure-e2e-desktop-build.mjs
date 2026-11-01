@@ -91,6 +91,10 @@ export const E2E_DESKTOP_BUILD_ENV_NAMES = [
   "ZCODE_CUA_HELPER_BUILD_ID",
   "ZCODE_ENDPOINT_ORIGIN",
   "ZCODE_ENV",
+  // 产品身份轴会改变编译进 bundle 的 __ZCODE_PRODUCT_FLAVOR__ define（vite/tsup），
+  // 不参与指纹会把 ZCode 的缓存构建错误复用到 Preview/MOS（或反向）的 E2E 运行。
+  "ZCODE_PREVIEW_IDENTITY",
+  "ZCODE_MOS_IDENTITY",
   "ZCODE_E2E_COVERAGE",
   "ZCODE_E2E_KEEP_BUILD_CACHE",
   "ZCODE_PACKAGED_AGENT_OTEL_ENDPOINT",

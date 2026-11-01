@@ -2835,6 +2835,52 @@ const zhCN: Record<string, string> = {
   "settings.themeCardTitle": "主题",
   "settings.themeCardDescription": "使用浅色、深色，或匹配系统设置",
   "chat.empty.greeting.office": "今天有什么工作，交给我吧",
+  "chat.empty.marketing.note":
+    "MOS 保留熟悉的 ZCode 任务流。营销能力是任务工具，不是独立的工作区。",
+  "settings.marketingConnections.title": "营销连接",
+  "settings.marketingConnections.badge.verified": "已核验",
+  "settings.marketingConnections.badge.notConnected": "未连接",
+  "settings.marketingConnections.badge.candidate": "候选",
+  "settings.marketingConnections.youtubePublic.label": "YouTube 公共研究",
+  "settings.marketingConnections.youtubePublic.detail":
+    "无密钥公共有机数据路由 · 访问路径已核验 2026-10-28",
+  "settings.marketingConnections.googleAtc.label": "Google Ads Transparency Center",
+  "settings.marketingConnections.googleAtc.detail":
+    "公开广告透明度源（美国区域） · 访问路径已核验 2026-10-29",
+  "settings.marketingConnections.youtubeAccount.label": "YouTube 账号连接（OAuth）",
+  "settings.marketingConnections.youtubeAccount.detail":
+    "发布与分析栈已实现；未记录生产同意流运行，账号未连接",
+  "settings.marketingConnections.metaAdLibrary.label": "Meta Ad Library API",
+  "settings.marketingConnections.metaAdLibrary.detail":
+    "候选：访问路径已探测 2026-10-28，需要凭据 —— 尚未用真实数据核验",
+  "settings.marketingConnections.tiktok.label": "TikTok Content Posting API",
+  "settings.marketingConnections.tiktok.detail":
+    "后续阶段的候选；连接未核验平台是显式拒绝项",
+  "settings.marketingConnections.note":
+    "状态渲染自数据源台账（docs/marketing/MARKETING-DATA-SOURCES.md，最后签署 {asOf}）。本页面不做实时探测；任务内的连接状态由 marketing 插件报告。",
+  "settings.marketingConnections.permissionRule":
+    "研究、分析、发布与付费广告的账号权限保持相互独立。在观察到真实数据之前，任何来源都不会被标注为已核验。",
+  "settings.aboutMOS.title": "关于 MOS",
+  "settings.aboutMOS.row.product": "产品",
+  "settings.aboutMOS.row.baseRuntime": "基础运行时",
+  "settings.aboutMOS.row.sourceRevision": "源修订号",
+  "settings.aboutMOS.row.buildTime": "构建时间",
+  "settings.aboutMOS.row.backendEnv": "后端环境",
+  "settings.aboutMOS.row.channel": "发布渠道",
+  "settings.aboutMOS.row.platform": "平台",
+  "settings.aboutMOS.row.updateStatus": "更新状态",
+  "settings.aboutMOS.update.notConfigured": "未配置 —— 没有 MOS 更新渠道",
+  "settings.aboutMOS.note":
+    "本页所有取值均为真实的运行时或构建期值。在建立 MOS 发布渠道之前，更新状态保持“未配置”。",
+  "settings.pluginStore.marketing.title": "Marketing OS 能力",
+  "settings.pluginStore.marketing.body":
+    "营销能力随 MOS 以内置 marketing 插件交付，由既有 ZCode agent 运行时调用。启用状态与权限管理走下方原生插件管理。",
+  "settings.pluginStore.marketing.capability.marketIntelligence": "市场情报",
+  "settings.pluginStore.marketing.capability.creativeIntelligence": "创意情报",
+  "settings.pluginStore.marketing.capability.experimentLearning": "实验与学习",
+  "settings.pluginStore.marketing.capability.publishingAnalytics": "发布与分析",
+  "settings.pluginStore.marketing.note":
+    "本卡片不会自动安装任何内容。市场与插件权限管理仍为原生 ZCode 功能。",
   "settings.interfaceMode": "界面模式",
   "settings.interfaceMode.office": "办公模式",
   "settings.interfaceMode.coding": "编程模式",

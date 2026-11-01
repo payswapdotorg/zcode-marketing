@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ZCODE_PRODUCT_FLAVOR } from "@zcode/shared";
 import darkEmptyStateLogoUrl from "@/assets/Z.svg";
 import { cn } from "@/components/lib/utils.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
@@ -237,6 +238,16 @@ export function ConversationDraftEmptyState({
         </span>
         <span>{greeting}</span>
       </p>
+      {/* MOS（marketing flavor）草稿首页的诚实说明行（原型 task-note 逐字落地）：
+          编译期 flavor 常量让该分支在默认构建中整体折叠，不产生任何运行时差异。 */}
+      {ZCODE_PRODUCT_FLAVOR === "marketing" ? (
+        <p
+          data-v4-draft-marketing-note="true"
+          className="relative z-10 -mt-3 w-full max-w-md px-4 text-center text-ui-sm text-foreground-subtle"
+        >
+          {intl.formatMessage({ id: "chat.empty.marketing.note" })}
+        </p>
+      ) : null}
     </div>
   );
 }

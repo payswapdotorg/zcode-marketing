@@ -21,7 +21,11 @@ export type SettingsSectionId =
   | "workspaceFileSearch"
   | "computerUse"
   | "automations"
-  | "shortcuts";
+  | "shortcuts"
+  // MOS（marketing flavor）专属分区（docs/marketing/MOS-INTAKE.md §4 行 15–16）：
+  // 只在 marketing 身份的构建里出现，默认构建不注册、不路由。
+  | "marketingConnections"
+  | "aboutMOS";
 
 export type SettingsUsageTabTarget = "app" | "codingPlan";
 export type SettingsPluginTabTarget = "plugins" | "mcps" | "skills" | "commands";
@@ -84,7 +88,9 @@ function isSettingsSectionId(value: string): value is SettingsSectionId {
     value === "workspaceFileSearch" ||
     value === "computerUse" ||
     value === "automations" ||
-    value === "shortcuts"
+    value === "shortcuts" ||
+    value === "marketingConnections" ||
+    value === "aboutMOS"
   );
 }
 

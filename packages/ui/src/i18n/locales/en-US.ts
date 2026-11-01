@@ -3031,6 +3031,52 @@ const enUS: Record<string, string> = {
   "settings.themeCardTitle": "Theme",
   "settings.themeCardDescription": "Use light, dark, or follow the system setting",
   "chat.empty.greeting.office": "What's on your plate today? Leave it to me.",
+  "chat.empty.marketing.note":
+    "MOS keeps the familiar ZCode task flow. Marketing capabilities are task tools, not separate workspaces.",
+  "settings.marketingConnections.title": "Marketing connections",
+  "settings.marketingConnections.badge.verified": "Verified",
+  "settings.marketingConnections.badge.notConnected": "Not connected",
+  "settings.marketingConnections.badge.candidate": "Candidate",
+  "settings.marketingConnections.youtubePublic.label": "YouTube public research",
+  "settings.marketingConnections.youtubePublic.detail":
+    "Keyless public organic routes · access path verified 2026-10-28",
+  "settings.marketingConnections.googleAtc.label": "Google Ads Transparency Center",
+  "settings.marketingConnections.googleAtc.detail":
+    "Public ad-transparency source (US region) · access path verified 2026-10-29",
+  "settings.marketingConnections.youtubeAccount.label": "YouTube account connection (OAuth)",
+  "settings.marketingConnections.youtubeAccount.detail":
+    "Publishing and analytics stack implemented; no production consent run recorded, so the account is not connected",
+  "settings.marketingConnections.metaAdLibrary.label": "Meta Ad Library API",
+  "settings.marketingConnections.metaAdLibrary.detail":
+    "Candidate: access path probed 2026-10-28, requires credentials — not verified with data",
+  "settings.marketingConnections.tiktok.label": "TikTok Content Posting API",
+  "settings.marketingConnections.tiktok.detail":
+    "Candidate for a later wave; connecting an unverified platform is a typed refusal",
+  "settings.marketingConnections.note":
+    "States are rendered from the data-source ledger (docs/marketing/MARKETING-DATA-SOURCES.md, last signed {asOf}). This page does not probe sources live; in-task connection status is reported by the marketing plugin.",
+  "settings.marketingConnections.permissionRule":
+    "Research, analytics, publishing and paid-ad account permissions remain distinct. No source is labelled verified until actual data is observed.",
+  "settings.aboutMOS.title": "About MOS",
+  "settings.aboutMOS.row.product": "Product",
+  "settings.aboutMOS.row.baseRuntime": "Base runtime",
+  "settings.aboutMOS.row.sourceRevision": "Source revision",
+  "settings.aboutMOS.row.buildTime": "Build time",
+  "settings.aboutMOS.row.backendEnv": "Backend environment",
+  "settings.aboutMOS.row.channel": "Channel",
+  "settings.aboutMOS.row.platform": "Platform",
+  "settings.aboutMOS.row.updateStatus": "Update status",
+  "settings.aboutMOS.update.notConfigured": "Not configured — no MOS update channel",
+  "settings.aboutMOS.note":
+    "All values on this page are real runtime or build-time values. The update status stays “not configured” until a MOS release channel exists.",
+  "settings.pluginStore.marketing.title": "Marketing OS capabilities",
+  "settings.pluginStore.marketing.body":
+    "The marketing capabilities ship with MOS as the built-in marketing plugin and are invoked by the existing ZCode agent runtime. Manage enablement and permissions through the native plugin management below.",
+  "settings.pluginStore.marketing.capability.marketIntelligence": "Market Intelligence",
+  "settings.pluginStore.marketing.capability.creativeIntelligence": "Creative Intelligence",
+  "settings.pluginStore.marketing.capability.experimentLearning": "Experiment & Learning",
+  "settings.pluginStore.marketing.capability.publishingAnalytics": "Publishing & Analytics",
+  "settings.pluginStore.marketing.note":
+    "Nothing is installed automatically by this card. The marketplace and plugin permission controls remain native ZCode features.",
   "settings.interfaceMode": "Interface mode",
   "settings.interfaceMode.office": "Office mode",
   "settings.interfaceMode.coding": "Coding mode",

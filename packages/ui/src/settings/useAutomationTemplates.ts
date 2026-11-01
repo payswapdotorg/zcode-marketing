@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { ZCODE_PRODUCT_FLAVOR } from "@zcode/shared";
 import { isValidCronExpr, type IClientScenesService } from "@zcode/services";
 import {
   isClientScenesBusinessError,
@@ -9,6 +10,7 @@ import {
   mapClientScenesToAutomationTemplates,
   type AutomationTemplateCatalog,
 } from "@/settings/automationTemplateCatalog.js";
+import { withMarketingScheduledTemplates } from "@/mos-product-flavor/index.js";
 
 export type AutomationTemplateCatalogState = AutomationTemplateCatalog & {
   loading: boolean;
@@ -19,7 +21,14 @@ export function useAutomationTemplates(
 ): AutomationTemplateCatalogState {
   const { scenes, loading, error } = useClientScenesResource(clientScenesService);
   const catalog = useMemo(
-    () => mapClientScenesToAutomationTemplates(scenes, isValidCronExpr),
+    // marketing flavor（MOS）在定时模板列表最前注入本地营销模板（MOS-05）；
+    // 注入与既有映射走同一套 cron 校验语义，无法安全编辑的进 rejected 列表。
+    () =>
+      withMarketingScheduledTemplates(
+        mapClientScenesToAutomationTemplates(scenes, isValidCronExpr),
+        ZCODE_PRODUCT_FLAVOR,
+        isValidCronExpr,
+      ),
     [scenes],
   );
 

@@ -11,7 +11,7 @@ import {
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { UpdateStatusButton } from "@/UpdateStatusButton.js";
 import { DesktopTopOverlayActionButton } from "@/DesktopTopOverlayActionButton.js";
-import { ZCodeStartupLogoBadge } from "@/root/RootStartupLoading.js";
+import { ProductLogoBadge } from "@/root/RootStartupLoading.js";
 import {
   createWindowsCaptionControlsStyle,
   WINDOWS_CAPTION_CONTROLS_RIGHT_INSET_VAR,
@@ -149,7 +149,9 @@ export function DesktopTopOverlay({
                   data-desktop-logo-visual
                   className="flex size-5 items-center justify-center transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0"
                 >
-                  <ZCodeStartupLogoBadge size="titlebar" animated={false} />
+                  {/* MOS（marketing flavor）下徽标是 "M" 字母标记（ProductLogoBadge 内部分支）；
+                      该按钮同时是侧栏 dock/undock 开关（原型语义），非 marketing 构建渲染 ZCode 图形徽标。 */}
+                  <ProductLogoBadge size="titlebar" animated={false} />
                 </span>
                 <SidebarToggleIcon className="absolute inset-0 m-auto size-4 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100" />
               </DesktopTopOverlayActionButton>

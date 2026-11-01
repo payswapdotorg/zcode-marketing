@@ -18,6 +18,7 @@ import { usePluginStoreOrder } from "@/hooks/usePluginStoreOrder.js";
 import { useScopedPluginManagementStore } from "@/store/pluginManagementStore.js";
 import { useMarketPluginUi } from "@/plugin-ui/index.js";
 import { PluginsSection } from "@/settings/PluginsSection.js";
+import { MarketingCapabilitiesCard } from "@/mos-product-flavor/index.js";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.js";
 import { resolvePluginUiSurfaceTitle } from "@/plugin-ui/index.js";
 import type { CreateTaskRequest } from "@/app-shell/types.js";
@@ -767,6 +768,8 @@ export function PluginStorePage({
         />
       ) : null}
       <div hidden={view !== "store"}>
+        {/* MOS（marketing flavor）能力说明卡：置于商店列表之前，默认构建折叠不渲染。 */}
+        <MarketingCapabilitiesCard />
         <PluginStoreListView
           order={storeOrder}
           items={items}

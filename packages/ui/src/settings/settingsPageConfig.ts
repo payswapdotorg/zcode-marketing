@@ -1,3 +1,4 @@
+import { ZCODE_PRODUCT_FLAVOR } from "@zcode/shared";
 import {
   Archive,
   Monitor,
@@ -20,6 +21,8 @@ import {
   HardDrive,
   Keyboard,
   FileSearch,
+  Megaphone,
+  Info,
 } from "lucide-react";
 import { isSettingsSectionEnabled, type SettingsSectionId } from "@/lib/settingsNavigation.js";
 import type { Theme } from "@/useTheme.js";
@@ -182,7 +185,30 @@ const BASE_SETTINGS_SECTIONS: SettingsSectionDefinition[] = [
 
 // 兼容既有只读消费者：默认配置代表不带桌面平台能力的 Web 视图；
 // macOS/Windows/Linux 必须继续通过 createSettingsPageConfig 动态加入 Computer Use。
-export const SETTINGS_SECTIONS = BASE_SETTINGS_SECTIONS.filter(
+// MOS（marketing flavor）专属分区（docs/marketing/MOS-INTAKE.md §4 行 15–16 / §8 MOS-05）：
+// "Marketing connections" 渲染数据源台账的真实核验状态；"About MOS" 是 Current State 视图
+// （§8 MOS-06）。编译期 flavor 常量保证默认构建的分区列表与引入前完全一致。
+const MARKETING_SETTINGS_SECTIONS: SettingsSectionDefinition[] =
+  ZCODE_PRODUCT_FLAVOR === "marketing"
+    ? [
+        {
+          id: "marketingConnections",
+          icon: Megaphone,
+          titleId: "settings.marketingConnections.title",
+          groupId: "dataAndStats",
+        },
+        {
+          id: "aboutMOS",
+          icon: Info,
+          titleId: "settings.aboutMOS.title",
+          groupId: "dataAndStats",
+        },
+      ]
+    : [];
+
+const ALL_SETTINGS_SECTIONS = [...BASE_SETTINGS_SECTIONS, ...MARKETING_SETTINGS_SECTIONS];
+
+export const SETTINGS_SECTIONS = ALL_SETTINGS_SECTIONS.filter(
   (section) => section.id !== "computerUse" && isSettingsSectionEnabled(section.id),
 );
 
@@ -198,7 +224,7 @@ export function createSettingsPageConfig({
   isWindowsDesktop = false,
 }: SettingsPageConfigOptions = {}) {
   const showComputerUse = isDesktop || isMacDesktop || isWindowsDesktop;
-  const settingsSections = BASE_SETTINGS_SECTIONS.filter((section) => {
+  const settingsSections = ALL_SETTINGS_SECTIONS.filter((section) => {
     if (section.id === "computerUse" && !showComputerUse) return false;
     return isSettingsSectionEnabled(section.id);
   });

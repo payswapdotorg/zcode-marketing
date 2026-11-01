@@ -1,6 +1,8 @@
 # MARKETING-ROADMAP
 
 > Phases, dependencies, deliverables, acceptance gates, and open blockers. Wave gates are non-negotiable; a wave is complete when its gate passes with recorded evidence (see WORK-REGISTRY.md for live status). Last updated: 2026-10-29 (**roadmap complete**: W0..W7 all closed — the vertical slice runs end to end, research → creative → authorized publishing → measured closed-loop learning, through the agent tool chain AND the rendered workspace panel, with the complete workspace regression suites green; the remaining growth paths are recorded honestly: production credentials (googleapis OAuth + a real channel), production-outcome calibration, and further platforms per demand).
+>
+> **MOS product-shape stream (2026-11-01):** the uploaded MOS prototype is implemented as an opt-in product identity — `ZCODE_MOS_IDENTITY=1` → marketing flavor (MOS branding/packaging, quick-starts, automation templates, store card, Marketing-connections + About-MOS/Current-State settings) with default builds unchanged; D-MOS-1 ratification pending, installer publication deferred. Milestones MOS-01…07 recorded in WORK-REGISTRY.md; e2e halves of the acceptance battery await the CI desktop-electron gate (sandbox-limited, evidence recorded).
 
 ## Wave plan
 

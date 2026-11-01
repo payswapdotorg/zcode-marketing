@@ -777,6 +777,21 @@ modules:
       app: .
     owner: marketing-tl
 
+  # mos-product-flavor：由 architecture:adopt 登记（MOS marketing flavor 在 ui 层的新增面）
+  - id: mos-product-flavor
+    roots:
+      - packages/ui/src/mos-product-flavor
+    managed: true
+    requires:
+      - shared
+      - ui
+    publicEntrypoints:
+      - packages/ui/src/mos-product-flavor/index.ts
+      - packages/ui/src/mos-product-flavor/contract.ts
+    layers:
+      ui: .
+    owner: marketing-tl
+
 global:
   # 临时时间戳（2026-09-10）：unmanaged-new-file 只约束此日期之后首次入库的文件。
   # 基于领先 staging 很多的分支开工时，merge-base 之前的"新增"文件不应被追溯。
@@ -930,3 +945,7 @@ exceptions:
       - packages/ui/src/settings/DynamicWorkflowModeSetting.tsx
       - packages/ui/src/store/dynamicWorkflowAvailabilityStore.ts
     reason: Admitted upstream files edited only to let the user's dynamic workflow mode choice always win and keep the settings row visible; adopting packages/shared/src and packages/ui/src needs a separate module boundary refactor.
+  - id: mos-product-identity-descriptor
+    rule: unmanaged-new-file
+    paths: [ packages/shared/src/productIdentity.ts ]
+    reason: MOS (marketing flavor) product-identity descriptor — a read-only, stateless compile-time constant module shared by the renderer brand surfaces and the desktop main About window (docs/marketing/MOS-INTAKE.md §8 MOS-02). Default-flavor output stays byte-identical to the pre-module constants; adopting the whole packages/shared/src tree needs a separate module boundary refactor and is out of scope for the MOS stream.

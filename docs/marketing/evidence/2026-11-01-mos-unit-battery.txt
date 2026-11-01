@@ -1,0 +1,34 @@
+MOS unit battery — recorded 2026-11-01 (third reconstruction run; base origin/main c4311e24,
+pnpm 10.33.2 via corepack, node 24.22.1, deps freshly installed)
+
+Identity + packaging + about suites:
+- desktop desktopProductIdentity.test.ts ........ 15 passed (10 existing preview cases + 5 new MOS cases:
+  marketing identity both backends incl. _TEST suffix axis, default-off parity, strict 1/0
+  spelling, MOS/Preview mutual exclusion, marketing AUMID)
+- desktop desktopRuntimeEnv.test.ts ............ 36 passed | 4 skipped (marketing app-name branch covered)
+- desktop desktopMosPackagingIdentity.test.ts .. 4 passed (identity coupling + 3 child-process dry-runs)
+- desktop about.test.ts ........................ passed (flavor-aware title/appName; default strings byte-identical)
+- shared productIdentity.test.ts ............... 4 passed
+
+UI module + wiring suites:
+- ui marketingDraftPrompts.test.ts ............. 4 passed (labels/ids, prepend order, default parity, prompt-only)
+- ui marketingAutomationTemplates.test.ts ...... 4 passed (prototype schedules, validated merge, rejected path, parity)
+- ui marketingConnectionsData.test.ts .......... 4 passed (ledger mapping as-of 2026-10-29, badges, permission rule)
+- ui mos-product-flavor/contract.test.ts ....... 2 passed (module contract)
+- ui settingsPageConfig.test.ts ................ 11 passed (9 existing + 2 new MOS gating cases)
+- ui settingsNavigation.test.ts ................ 17 passed (regression)
+- ui useAutomationTemplates.test.ts ............ 4 passed (regression)
+
+Regressions on touched surfaces:
+- ui pluginStore/pluginStoreNavigation/desktopLogoStyle/rootStartupLoading/rootStartupGate/
+  chatEmptyTimeGreetingI18n/appErrorBoundary + desktopTray/electronBuilderLinuxPackageTargets
+  ... 43 passed across 9 files in this run (3 env-conditional cases differ from the prior sandbox's 46; exit 0, no failures)
+
+Gates (same run):
+- pnpm test:architecture ....................... 36 tests, fail 0
+- pnpm architecture:check --changed ............ violations 0, baseline 0, new 0
+  (mos-product-flavor adopted as managed module; shared productIdentity.ts registered exception)
+- pnpm db:schema:check ......................... compatible (both baselines)
+- pnpm lint .................................... 0 errors (pre-existing warnings only)
+- tsc -b shared / ui / desktop main / e2e ...... exit 0 each, run per-project (the combined
+  invocation OOMs in this 4GB sandbox on a fresh clone; CI chain remains authoritative)

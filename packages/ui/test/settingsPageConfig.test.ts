@@ -119,4 +119,41 @@ describe("settingsPageConfig", () => {
       "general",
     );
   });
+
+  // ── MOS（marketing flavor）专属分区（docs/marketing/MOS-INTAKE.md §8 MOS-05）──
+
+  it("marketing flavor 在 dataAndStats 组追加 Marketing connections 与 About MOS 分区", async () => {
+    vi.resetModules();
+    vi.doMock("@zcode/shared", async () => {
+      const actual = await vi.importActual<typeof import("@zcode/shared")>("@zcode/shared");
+      return {
+        ...actual,
+        ZCODE_PRODUCT_FLAVOR: "marketing",
+      };
+    });
+    const { createSettingsPageConfig, SETTINGS_SECTIONS } = await import(
+      "../src/settings/settingsPageConfig.js"
+    );
+    const { settingsSectionGroups, settingsSections } = createSettingsPageConfig({ isDesktop: true });
+
+    const dataAndStats = settingsSectionGroups.find((group) => group.id === "dataAndStats");
+    expect(dataAndStats?.sections.map((section) => section.id)).toEqual([
+      "usage",
+      "archives",
+      "marketingConnections",
+      "aboutMOS",
+    ]);
+    expect(settingsSections.map((section) => section.id)).toContain("marketingConnections");
+    expect(settingsSections.map((section) => section.id)).toContain("aboutMOS");
+    expect(SETTINGS_SECTIONS.map((section) => section.id)).toContain("aboutMOS");
+  });
+
+  it("非 marketing flavor 的分区列表不含 MOS 分区（默认构建不变）", async () => {
+    const { createSettingsPageConfig, SETTINGS_SECTIONS } = await loadSettingsPageConfig("test");
+    const { settingsSections } = createSettingsPageConfig({ isDesktop: true });
+    for (const id of ["marketingConnections", "aboutMOS"] as const) {
+      expect(settingsSections.map((section) => section.id)).not.toContain(id);
+      expect(SETTINGS_SECTIONS.map((section) => section.id)).not.toContain(id);
+    }
+  });
 });

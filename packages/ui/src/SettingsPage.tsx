@@ -89,6 +89,7 @@ import { WorkspaceFileSearchSection } from "@/settings/WorkspaceFileSearchSectio
 import { MemorySettingsSection } from "@/settings/MemorySettingsSection.js";
 import { BrowserSettingsSection } from "@/settings/BrowserSettingsSection.js";
 import { ComputerUseSection } from "@/settings/ComputerUseSection.js";
+import { MarketingConnectionsSection, AboutMosSection } from "@/mos-product-flavor/index.js";
 import { ShortcutSettingsSection } from "@/settings/ShortcutSettingsSection.js";
 import { MigrationSection } from "@/settings/MigrationSection.js";
 import { SETTINGS_FRAME_CONTENT_CLASSNAME } from "@/settings/SettingsPageParts.js";
@@ -2227,6 +2228,10 @@ export function SettingsPage({
                                 handleEmbeddedBrowserAllowInsecureCertificatesChange
                               }
                             />
+                          ) : activeSection === "marketingConnections" ? (
+                            <MarketingConnectionsSection />
+                          ) : activeSection === "aboutMOS" ? (
+                            <AboutMosSection />
                           ) : activeSection === "computerUse" ? (
                             <ComputerUseSection
                               isDesktop={Boolean(isDesktop)}

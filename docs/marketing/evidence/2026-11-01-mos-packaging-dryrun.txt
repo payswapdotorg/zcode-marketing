@@ -1,0 +1,21 @@
+MOS packaging dry-run (AT-MOS-2) — recorded 2026-11-01
+Real child-process imports of packages/desktop/electron-builder.config.js under env axes:
+
+[1] ZCODE_ENV=production ZCODE_MOS_IDENTITY=1
+{"productName":"MOS","appId":"dev.zcode.app.mos","linuxExecutableName":"mos",
+ "rpmPackageName":"mos","debPackageName":"mos","pacmanPackageName":"mos",
+ "linuxArtifactName":"${productName}-${version}-linux-${arch}.${ext}",
+ "extraMetadataFlavor":"marketing"}
+
+[2] ZCODE_ENV=test ZCODE_MOS_IDENTITY=1
+{"productName":"MOS", "linuxArtifactName":"${productName}-${version}-linux-${arch}_TEST.${ext}"}
+=> backend axis suffix (_TEST) preserved under marketing identity.
+
+[3] ZCODE_ENV=production (no identity flags — parity control)
+{"productName":"ZCode","appId":"dev.zcode.app","linuxExecutableName":"zcode",
+ "rpmPackageName":"zcode","debPackageName":"zcode","pacmanPackageName":"zcode",
+ "extraMetadataFlavor":"production"}
+
+Encoded as the required unit gate: packages/desktop/test/desktopMosPackagingIdentity.test.ts.
+macOS signing guard now applies to every non-production flavor (preview AND marketing) —
+electron-builder.config.js; conflict of both identity flags fails at build time.
