@@ -48,7 +48,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run the desktop E2E container suite (MOS formal single-spec run)
-        run: bash scripts/test-desktop-e2e-container.sh
+        run: |
+          set -o pipefail
+          bash scripts/test-desktop-e2e-container.sh 2>&1 | tee mos-container-run.log
+      - name: Surface failure summary (annotations)
+        if: failure()
+        run: |
+          # The push token used to manage this repo cannot download job logs
+          # (actions:read is admin-gated); annotations are the readable channel.
+          # Emit the failure-relevant excerpt of the container output as
+          # workflow annotations so failures are diagnosable from the API.
+          sed -r "s/\x1B\[[0-9;]*[mK]//g" mos-container-run.log > mos-container-run.clean.log || true
+          n=0
+          grep -nE "✗|✘|FAIL|Error:|expect\(|AssertionError|TimeoutError|waitFor|Element .* not found" mos-container-run.clean.log | head -30 | while IFS= read -r line; do
+            printf '::error title=mos-e2e-failure::%s\n' "${line:0:240}"
+            n=$((n+1))
+          done
+          printf '::error title=mos-e2e-tail::%s\n' "$(tail -c 2200 mos-container-run.clean.log | tr '\n' ' ' | tr -s ' ')"
       - name: List E2E artifact tree (diagnosability)
         if: always()
         run: find packages/desktop/.e2e-artifacts packages/desktop/errorShots -type f 2>/dev/null | head -50 || true
