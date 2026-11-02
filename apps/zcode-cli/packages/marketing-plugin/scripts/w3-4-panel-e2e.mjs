@@ -16,6 +16,11 @@
 //      the mission list without any panel-side action.
 //   7-9 (W4): the creative handoff driven through the panel — draft pack,
 //      explicit approval, chunked bring-back with the rubric report.
+//   WO-P5 wave-2 (AT-P5.2/AT-P5.4 at the panel): the awareness mission's
+//      ad-fixture subjects (impressions-only; 'views' has no proxy ladder)
+//      render explicit no-observation chips — absence stated, never blanked —
+//      while the organic fixture signals carry values, and the point-of-use
+//      coverage disclosure renders inline at the signals card.
 //   10-15 (W5/W6): the loop driven through the panel — connect a sandbox test
 //      account (health-checked against this script's local wire endpoint),
 //      publish the approved asset (idempotent — replay adds no post), verify
@@ -326,6 +331,116 @@ try {
     true,
     `${opportunityCount} opportunities with ${scoreChips} separated score chips (observed / cross-source / predicted / confidence)`,
   );
+
+  // ---------------------------------------------------------------------
+  // WO-P5 wave-2 gates: explicit absence + point-of-use coverage
+  // disclosure, driven through the panel in the browser.
+  // ---------------------------------------------------------------------
+  // The SECOND mission (agent-started above, objective awareness) has not
+  // been researched yet. Research it agent-side: its confirmed competitors'
+  // ad fixtures carry impressions only, and the awareness primary metric
+  // 'views' has an EMPTY proxy ladder — so the ad subjects must surface
+  // honest not_observed signals (no invented values) while the organic
+  // fixture subjects carry real values. The research call runs the same
+  // composite connector as the panel's own research button (demo mode: the
+  // real keyless public connector reports its honest coverage plus the
+  // labeled synthetic fixtures), so it gets an extended request timeout.
+  const secondDiscover = await call("marketing_discover_competitors", {
+    missionId: "mission-panel-second",
+    hints: ["RivalOne", "RivalTwo"],
+    confirm: ["RivalOne", "RivalTwo"],
+  });
+  assert.ok(!secondDiscover.isError, JSON.stringify(secondDiscover.content));
+  const secondResearch = await client.callTool(
+    { name: "marketing_research_platform", arguments: { missionId: "mission-panel-second" } },
+    undefined,
+    { timeout: 120000 },
+  );
+  assert.ok(!secondResearch.isError, JSON.stringify(secondResearch.content));
+  // Switch the panel to the second mission through its own UI (the sidebar
+  // mission item) — the panel then loads the report through the bridge.
+  await frame.locator('.mission-item[data-mission="mission-panel-second"]').click();
+  await frame
+    .locator('.card:has(h2:text("Performance signals")) .rows .row')
+    .first()
+    .waitFor({ timeout: 20000 });
+
+  // AT-P5.2 at the panel: signals without values render the explicit
+  // no-observation chip (never blank, never zero, never interpolated).
+  const chipTexts = await frame
+    .locator('.card:has(h2:text("Performance signals")) .score.no-observation')
+    .allTextContents();
+  assert.ok(
+    chipTexts.some((t) => /no observation.*not observed/i.test(t)),
+    `expected an explicit no-observation chip with the not-observed reason, got: ${chipTexts.join(" | ")}`,
+  );
+  const signalRows = await frame
+    .locator('.card:has(h2:text("Performance signals")) .rows .row')
+    .allTextContents();
+  // Ad fixture subjects (ad-rivalone-v0/ad-rivaltwo-v0) are impressions-only;
+  // 'views' has no proxy ladder, so every one of their signals is an honest
+  // no-observation row. Real public-feed subjects (yt:<videoId>) may add
+  // valued rows; the fixture organic subjects (yt-101/yt-102) carry three
+  // views snapshots each and must render velocity.
+  const adSignalRows = signalRows.filter((t) => /ad-rival/i.test(t));
+  assert.ok(
+    adSignalRows.length > 0,
+    `expected ad-subject signal rows (ad-rivalone-v0/ad-rivaltwo-v0), got: ${signalRows.join(" | ")}`,
+  );
+  assert.ok(
+    adSignalRows.every((t) => /no observation/i.test(t)),
+    `every ad-subject signal must carry the no-observation chip (impressions-only subjects; 'views' has no proxy ladder), got: ${adSignalRows.join(" | ")}`,
+  );
+  assert.ok(
+    adSignalRows.every((t) => !/total\s|velocity\//.test(t)),
+    "a no-observation signal must not render total/velocity values",
+  );
+  const organicFixtureRows = signalRows.filter((t) => /yt-10\d/.test(t));
+  assert.ok(
+    organicFixtureRows.length > 0 && organicFixtureRows.every((t) => /velocity\/7d/.test(t)),
+    `organic fixture signals must carry real values (yt-101/yt-102 have views snapshots), got: ${organicFixtureRows.join(" | ")}`,
+  );
+  gate(
+    "panel-renders-no-observation-chips",
+    true,
+    `${adSignalRows.length} ad-fixture signals with explicit no-observation chips (not observed), ${organicFixtureRows.length} organic fixture signals valued — absence stated, never blanked`,
+  );
+  // The panel scrolls internally (fixed-height container), so bring the
+  // asserted rows into the captured viewport before the screenshot.
+  await frame.locator(".score.no-observation").first().scrollIntoViewIfNeeded();
+  await shotFull("10-no-observation-signals.png");
+
+  // AT-P5.4 at the panel: the point-of-use coverage disclosure renders
+  // inline with the signals it feeds (window/limit marker per source).
+  const pointOfUse = await frame.locator(".point-of-use-coverage").first().textContent();
+  assert.ok(
+    pointOfUse && /coverage at point of use|使用点的来源覆盖/i.test(pointOfUse),
+    `expected the point-of-use coverage hint, got: ${pointOfUse ?? "(none)"}`,
+  );
+  assert.ok(
+    /sample-adlib|sample-platform|connector:sample|source:/.test(pointOfUse),
+    `the hint must name the feeding sources, got: ${pointOfUse}`,
+  );
+  gate(
+    "panel-renders-point-of-use-coverage",
+    true,
+    "inline coverage disclosure with feeding sources rendered at the signals card",
+  );
+  await frame.locator(".point-of-use-coverage").first().scrollIntoViewIfNeeded();
+  await shotFull("11-point-of-use-coverage.png");
+
+  // Back to the FIRST mission's report view for the W4 gates below (the
+  // original flow had the panel on that view at this point).
+  const waveTwoList = await call("marketing_mission_list", {});
+  const waveTwoFirst = waveTwoList.structuredContent.missions.find(
+    (m) => m.brief.product === "portable espresso maker",
+  );
+  assert.ok(waveTwoFirst, "first mission still exists");
+  await frame.locator(`.mission-item[data-mission="${waveTwoFirst.missionId}"]`).click();
+  await frame
+    .locator('.card:has(h2:text("Data coverage"))')
+    .first()
+    .waitFor({ timeout: 20000 });
 
   // ---------------------------------------------------------------------
   // W4 gates: the creative handoff driven through the panel in the browser.

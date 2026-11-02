@@ -12,6 +12,7 @@
     "build": "tsc --build .",
     "demo:loop": "tsc --build . && node dist/demo/runLoop.js",
     "demo:sqlite": "tsc --build . && node dist/demo/runSqliteConformance.js",
+    "demo:p5-snapshots": "tsc --build . && node dist/demo/runP5SnapshotExport.js",
     "verify:sources": "tsc --build . && node dist/demo/runSourceVerification.js",
     "verify:adsource": "tsc --build . && node dist/demo/runAdSourceVerification.js"
   },

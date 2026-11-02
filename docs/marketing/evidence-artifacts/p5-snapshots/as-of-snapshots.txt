@@ -1,0 +1,32 @@
+WO-P5 wave-2 — exported as-of snapshots (gate-P5 closure evidence)
+generated: 2026-11-02T10:41:44.756Z
+data: synthetic fixtures only (fixture:p5, 2026-01 timestamps) — temporal semantics evidence, not market facts
+
+Fixture history (subject yt-fixture-201, metric views):
+  2026-01-05T10:00:00.000Z  value=1000  (p5-a)
+  2026-01-12T10:00:00.000Z  value=1500  (p5-b)
+  2026-01-19T10:00:00.000Z  value=2200  (p5-c)
+
+As-of snapshots — in-memory TemporalStore and SQLite adapter (byte-identical cross-engine):
+  as-of 2026-01-02T10:00:00.000Z [before_coverage]  values=[]  (sqlite identical: true)
+  as-of 2026-01-05T10:00:00.000Z [first_observation]  values=[1000]  (sqlite identical: true)
+  as-of 2026-01-08T10:00:00.000Z [between_observations]  values=[1000]  (sqlite identical: true)
+  as-of 2026-01-12T10:00:00.000Z [second_observation]  values=[1000, 1500]  (sqlite identical: true)
+  as-of 2026-01-19T10:00:00.000Z [third_observation]  values=[1000, 1500, 2200]  (sqlite identical: true)
+  as-of 2026-01-25T10:00:00.000Z [after_all]  values=[1000, 1500, 2200]  (sqlite identical: true)
+
+Workflow-level signal evaluations (noObservation contract field):
+  as-of 2026-01-02T10:00:00.000Z [before_coverage]  yt-fixture-201  noObservation: reason=before_coverage — first observation of this entity is 2026-01-05T10:00:00.000Z — the window begins after it
+  as-of 2026-01-02T10:00:00.000Z [before_coverage]  yt-fixture-404  noObservation: reason=not_observed — no observation of views has ever been recorded for yt-fixture-404
+  as-of 2026-01-05T10:00:00.000Z [first_observation]  yt-fixture-201  total=1000 velocity=undefined
+  as-of 2026-01-05T10:00:00.000Z [first_observation]  yt-fixture-404  noObservation: reason=not_observed — no observation of views has ever been recorded for yt-fixture-404
+  as-of 2026-01-08T10:00:00.000Z [between_observations]  yt-fixture-201  total=1000 velocity=undefined
+  as-of 2026-01-08T10:00:00.000Z [between_observations]  yt-fixture-404  noObservation: reason=not_observed — no observation of views has ever been recorded for yt-fixture-404
+  as-of 2026-01-12T10:00:00.000Z [second_observation]  yt-fixture-201  total=1500 velocity=500
+  as-of 2026-01-12T10:00:00.000Z [second_observation]  yt-fixture-404  noObservation: reason=not_observed — no observation of views has ever been recorded for yt-fixture-404
+  as-of 2026-01-19T10:00:00.000Z [third_observation]  yt-fixture-201  total=2200 velocity=600
+  as-of 2026-01-19T10:00:00.000Z [third_observation]  yt-fixture-404  noObservation: reason=not_observed — no observation of views has ever been recorded for yt-fixture-404
+  as-of 2026-01-25T10:00:00.000Z [after_all]  yt-fixture-201  total=2200 velocity=600
+  as-of 2026-01-25T10:00:00.000Z [after_all]  yt-fixture-404  noObservation: reason=not_observed — no observation of views has ever been recorded for yt-fixture-404
+
+Gates: AT-P5.1 reproducibility (cross-engine, between-observations no-interpolation) PASS; AT-P5.2 explicit absence (before_coverage / not_observed) PASS.

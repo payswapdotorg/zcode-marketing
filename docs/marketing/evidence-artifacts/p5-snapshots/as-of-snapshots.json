@@ -1,0 +1,221 @@
+{
+  "kind": "WO-P5 as-of snapshot export",
+  "generatedAt": "2026-11-02T10:41:44.756Z",
+  "dataProvenance": "synthetic fixtures only (fixture:p5 source ids, 2026-01 fixture timestamps) — proves temporal semantics, not market facts",
+  "fixtureHistory": {
+    "subjectRef": "yt-fixture-201",
+    "metricKey": "views",
+    "observations": [
+      {
+        "id": "p5-a",
+        "value": 1000,
+        "observedAt": "2026-01-05T10:00:00.000Z"
+      },
+      {
+        "id": "p5-b",
+        "value": 1500,
+        "observedAt": "2026-01-12T10:00:00.000Z"
+      },
+      {
+        "id": "p5-c",
+        "value": 2200,
+        "observedAt": "2026-01-19T10:00:00.000Z"
+      }
+    ]
+  },
+  "engines": {
+    "inMemory": [
+      {
+        "asOf": "2026-01-02T10:00:00.000Z",
+        "asOfLabel": "before_coverage",
+        "values": []
+      },
+      {
+        "asOf": "2026-01-05T10:00:00.000Z",
+        "asOfLabel": "first_observation",
+        "values": [
+          1000
+        ]
+      },
+      {
+        "asOf": "2026-01-08T10:00:00.000Z",
+        "asOfLabel": "between_observations",
+        "values": [
+          1000
+        ]
+      },
+      {
+        "asOf": "2026-01-12T10:00:00.000Z",
+        "asOfLabel": "second_observation",
+        "values": [
+          1000,
+          1500
+        ]
+      },
+      {
+        "asOf": "2026-01-19T10:00:00.000Z",
+        "asOfLabel": "third_observation",
+        "values": [
+          1000,
+          1500,
+          2200
+        ]
+      },
+      {
+        "asOf": "2026-01-25T10:00:00.000Z",
+        "asOfLabel": "after_all",
+        "values": [
+          1000,
+          1500,
+          2200
+        ]
+      }
+    ],
+    "sqlite": [
+      {
+        "asOf": "2026-01-02T10:00:00.000Z",
+        "asOfLabel": "before_coverage",
+        "values": []
+      },
+      {
+        "asOf": "2026-01-05T10:00:00.000Z",
+        "asOfLabel": "first_observation",
+        "values": [
+          1000
+        ]
+      },
+      {
+        "asOf": "2026-01-08T10:00:00.000Z",
+        "asOfLabel": "between_observations",
+        "values": [
+          1000
+        ]
+      },
+      {
+        "asOf": "2026-01-12T10:00:00.000Z",
+        "asOfLabel": "second_observation",
+        "values": [
+          1000,
+          1500
+        ]
+      },
+      {
+        "asOf": "2026-01-19T10:00:00.000Z",
+        "asOfLabel": "third_observation",
+        "values": [
+          1000,
+          1500,
+          2200
+        ]
+      },
+      {
+        "asOf": "2026-01-25T10:00:00.000Z",
+        "asOfLabel": "after_all",
+        "values": [
+          1000,
+          1500,
+          2200
+        ]
+      }
+    ],
+    "crossEngineByteIdentical": true
+  },
+  "workflowSignals": [
+    {
+      "asOf": "2026-01-02T10:00:00.000Z",
+      "asOfLabel": "before_coverage",
+      "subjectRef": "yt-fixture-201",
+      "noObservation": {
+        "reason": "before_coverage",
+        "detail": "first observation of this entity is 2026-01-05T10:00:00.000Z — the window begins after it"
+      }
+    },
+    {
+      "asOf": "2026-01-02T10:00:00.000Z",
+      "asOfLabel": "before_coverage",
+      "subjectRef": "yt-fixture-404",
+      "noObservation": {
+        "reason": "not_observed",
+        "detail": "no observation of views has ever been recorded for yt-fixture-404"
+      }
+    },
+    {
+      "asOf": "2026-01-05T10:00:00.000Z",
+      "asOfLabel": "first_observation",
+      "subjectRef": "yt-fixture-201",
+      "total": 1000
+    },
+    {
+      "asOf": "2026-01-05T10:00:00.000Z",
+      "asOfLabel": "first_observation",
+      "subjectRef": "yt-fixture-404",
+      "noObservation": {
+        "reason": "not_observed",
+        "detail": "no observation of views has ever been recorded for yt-fixture-404"
+      }
+    },
+    {
+      "asOf": "2026-01-08T10:00:00.000Z",
+      "asOfLabel": "between_observations",
+      "subjectRef": "yt-fixture-201",
+      "total": 1000
+    },
+    {
+      "asOf": "2026-01-08T10:00:00.000Z",
+      "asOfLabel": "between_observations",
+      "subjectRef": "yt-fixture-404",
+      "noObservation": {
+        "reason": "not_observed",
+        "detail": "no observation of views has ever been recorded for yt-fixture-404"
+      }
+    },
+    {
+      "asOf": "2026-01-12T10:00:00.000Z",
+      "asOfLabel": "second_observation",
+      "subjectRef": "yt-fixture-201",
+      "total": 1500,
+      "velocity": 500
+    },
+    {
+      "asOf": "2026-01-12T10:00:00.000Z",
+      "asOfLabel": "second_observation",
+      "subjectRef": "yt-fixture-404",
+      "noObservation": {
+        "reason": "not_observed",
+        "detail": "no observation of views has ever been recorded for yt-fixture-404"
+      }
+    },
+    {
+      "asOf": "2026-01-19T10:00:00.000Z",
+      "asOfLabel": "third_observation",
+      "subjectRef": "yt-fixture-201",
+      "total": 2200,
+      "velocity": 600
+    },
+    {
+      "asOf": "2026-01-19T10:00:00.000Z",
+      "asOfLabel": "third_observation",
+      "subjectRef": "yt-fixture-404",
+      "noObservation": {
+        "reason": "not_observed",
+        "detail": "no observation of views has ever been recorded for yt-fixture-404"
+      }
+    },
+    {
+      "asOf": "2026-01-25T10:00:00.000Z",
+      "asOfLabel": "after_all",
+      "subjectRef": "yt-fixture-201",
+      "total": 2200,
+      "velocity": 600
+    },
+    {
+      "asOf": "2026-01-25T10:00:00.000Z",
+      "asOfLabel": "after_all",
+      "subjectRef": "yt-fixture-404",
+      "noObservation": {
+        "reason": "not_observed",
+        "detail": "no observation of views has ever been recorded for yt-fixture-404"
+      }
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+================================================================================
+Marketing workspace panel — browser E2E, WO-P5 wave-2 (gate-P5 closure evidence)
+Date: 2026-11-02 (UTC)  ·  exit code: 0  ·  19 gates, no page errors
+Reproduce: MARKETING_E2E_ARTIFACTS=<dir> pnpm --filter @zcode/marketing-plugin demo:w3-4
+Browser: real Chromium (143) through the MCP Apps AppBridge host — the panel
+iframe runs under the ZCode desktop sandbox CSP, talking to the REAL bundled
+plugin server over /rpc (bridge proxies tool calls exactly like the host).
+
+WO-P5 wave-2 gates (the panel screenshots recorded as a wave-1 deferral):
+the SECOND mission (objective awareness) is discovered, confirmed, and
+researched agent-side through the real server; switching the panel to it
+through its own sidebar UI loads the report through the bridge. The
+ad-fixture subjects (ad-rivalone-v0/ad-rivaltwo-v0) carry impressions only
+and the awareness primary metric 'views' has an EMPTY proxy ladder, so their
+signals render explicit no-observation chips (reason not observed — never
+blank, never zero, never interpolated) while the organic fixture signals
+(yt-101/yt-102, three views snapshots each) render real totals and velocity.
+The point-of-use coverage disclosure renders inline at the signals card,
+naming the feeding sources with their windows (AT-P5.4). The W3-4/W4/W5/W6
+gates all re-ran green in the same drive (behavior unchanged by wave-1).
+
+Visual artifacts: docs/marketing/evidence-artifacts/10-no-observation-signals.png
+and 11-point-of-use-coverage.png — both scroll the signals card into the
+captured viewport (scrollIntoViewIfNeeded before the shot, so the asserted
+elements are in frame by contract); the hint and the chips sit in the same
+card, so the two shots converge on the same view showing both surfaces.
+As-of snapshot exports (the other deferred artifact, same date):
+docs/marketing/evidence-artifacts/p5-snapshots/as-of-snapshots.{json,txt}
+via pnpm --filter @zcode/marketing demo:p5-snapshots.
+================================================================================
+
+marketing workspace panel — browser E2E gates (W3-4 + W4 + W5/W6)
+server: /home/z/my-project/zcode/apps/zcode-cli/packages/marketing-plugin/dist/server.mjs (real bundled plugin process)
+panel: ui://marketing/panel.html (651 KiB self-contained resource)
+browser: chromium 143.0.7499.4 — MCP Apps AppBridge host, desktop sandbox CSP
+artifacts: /tmp/wave2-artifacts
+
+PASS  panel-connects-and-renders-hero — onboarding form visible after MCP Apps handshake
+PASS  onboarding-form-starts-mission — mission view renders the persisted brief
+PASS  panel-discovery-confirms-competitors — 2 candidates user-confirmed and persisted
+PASS  panel-research-renders-coverage — coverage slices rendered: unavailable, unavailable, unavailable, not_connected, available, restricted
+PASS  evidence-tab-renders-provenance — 3 provenance tables rendered
+PASS  agent-tool-result-refreshes-panel — mission list updated from a forwarded tool result, no panel action
+PASS  report-renders-ranked-opportunities — 1 opportunities with 5 separated score chips (observed / cross-source / predicted / confidence)
+PASS  panel-renders-no-observation-chips — 2 ad-fixture signals with explicit no-observation chips (not observed), 2 organic fixture signals valued — absence stated, never blanked
+PASS  panel-renders-point-of-use-coverage — inline coverage disclosure with feeding sources rendered at the signals card
+PASS  panel-drafts-creative-handoff-pack — handoff pack renders with timed script beats, prompt packs and provenance
+PASS  panel-review-approves-pack — explicit approval flips the artifact status to approved
+PASS  panel-records-asset-with-rubric — chunked import + declaration recorded; 8 rubric checks rendered with the file in the mission workspace
+PASS  panel-connects-sandbox-account — health-checked account connected, sandbox-labeled, token-free row rendered
+PASS  panel-publishes-through-connected-account — idempotent upload (1 wire POST+PUT), post identity + SANDBOX badge rendered
+PASS  panel-idempotent-replay-single-publication — agent retry returned the same publication; panel still shows exactly one
+PASS  panel-verifies-publication — connected-account verification (videos.list) flips the chip to verified
+PASS  panel-measures-and-collects-analytics — window opened on the W4 spec; permitted analytics rendered (views = 5400)
+PASS  panel-records-outcome-and-closes-loop — [PROXY]-labeled comparison against the declared proxy baseline, appended calibration, grounded recommendation — all rendered
+PASS  no-page-errors — clean console
+
+no page errors
