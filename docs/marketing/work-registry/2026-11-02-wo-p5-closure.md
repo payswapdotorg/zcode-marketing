@@ -41,4 +41,4 @@ The gate row reads: *"P5 — Historical integrity | WO-P5 | Reproducible as-of q
 
 ## 6. CI acceptance
 
-Pushed with this entry; the run reference is recorded in the WORK-REGISTRY change-log row for 2026-11-02 once green (the unit job runs the new export script's package only through typecheck/build — the script itself is demo evidence, run on demand; the plugin suite and the domain fixture suite run in the root unit job).
+Landing commit `155f387b` — CI run **41432290482** (2026-11-02), all six gates green: governance (lint / schema / architecture), typecheck (full tsc chain), unit (complete root suite + cli plugin chains — including the Reset-guard pre-flight (WO-G1) step, the root suite with the WO-P5 fixture suite, the bootstrap plugin-registry suite, the adapters plugin conformance suite, and the marketing plugin suite, each step concluded success), youtube-oauth, cred-hygiene, desktop e2e (electron, container, replay-isolated). The export script itself is demo evidence run on demand (`demo:p5-snapshots`); its package is covered in CI by typecheck/build and the domain fixture suite.
